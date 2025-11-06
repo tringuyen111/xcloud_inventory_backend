@@ -13,6 +13,7 @@ const DashboardIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h
 const CubeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>;
 const CogIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066 2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
 const ChartBarIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>;
+const DatabaseIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>;
 const ChevronDownIcon = ({ className }: { className?: string }) => <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${className || ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>;
 
 const navItems: NavItem[] = [
@@ -40,6 +41,7 @@ const navItems: NavItem[] = [
     ]},
     { name: 'Reports', path: '/reports', icon: <ChartBarIcon /> },
     { name: 'Settings', path: '/settings', icon: <CogIcon /> },
+    { name: 'DB Schema', path: '/db-schema', icon: <DatabaseIcon /> },
 ];
 
 const Sidebar: React.FC = () => {
@@ -67,7 +69,7 @@ const Sidebar: React.FC = () => {
             if (item.subItems) {
                 return (
                     <div key={item.name}>
-                        <button onClick={() => toggleMenu(item.path)} className={`w-full flex justify-between items-center text-left py-3 px-4 rounded-md transition-colors duration-200 ${isActive ? 'bg-[#1976d2] text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}`}>
+                        <button onClick={() => toggleMenu(item.path)} className={`w-full flex justify-between items-center text-left py-3 px-4 rounded-md transition-colors duration-200 ${isActive ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>
                             <div className="flex items-center space-x-3">
                                 {item.icon}
                                 <span>{item.name}</span>
@@ -82,7 +84,7 @@ const Sidebar: React.FC = () => {
                                         <NavLink
                                             key={subItem.name}
                                             to={subItem.path}
-                                            className={`block py-2 px-3 rounded-md text-sm transition-colors duration-200 ${isSubActive ? 'bg-[#1976d2] text-white' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}>
+                                            className={`block py-2 px-3 rounded-md text-sm transition-colors duration-200 ${isSubActive ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`}>
                                             {subItem.name}
                                         </NavLink>
                                     )
@@ -97,7 +99,7 @@ const Sidebar: React.FC = () => {
                 <NavLink
                     key={item.name}
                     to={item.path}
-                    className={`flex items-center space-x-3 py-3 px-4 rounded-md transition-colors duration-200 ${isActive ? 'bg-[#1976d2] text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}`}
+                    className={`flex items-center space-x-3 py-3 px-4 rounded-md transition-colors duration-200 ${isActive ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
                 >
                     {item.icon}
                     <span>{item.name}</span>
@@ -107,8 +109,8 @@ const Sidebar: React.FC = () => {
     };
 
     return (
-        <aside className={`bg-[#1E1F23] text-white transition-all duration-300 ease-in-out ${isOpen ? 'w-64' : 'w-0'} md:w-64 h-full flex flex-col`}>
-            <div className="flex items-center justify-center h-16 border-b border-slate-700">
+        <aside className={`bg-gray-800 text-white transition-all duration-300 ease-in-out ${isOpen ? 'w-64' : 'w-0'} md:w-64 h-full flex flex-col`}>
+            <div className="flex items-center justify-center h-16 border-b border-gray-700">
                 <h1 className="text-2xl font-bold text-white">XCloud</h1>
             </div>
             <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">

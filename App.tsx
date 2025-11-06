@@ -1,5 +1,7 @@
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider } from '@mui/material/styles';
+import { theme } from './styles/theme';
 
 import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
@@ -22,6 +24,7 @@ import ReportsPage from './pages/reports/ReportsPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import AppLayout from './components/layout/AppLayout';
 import useAuthStore from './stores/authStore';
+import DbSchemaPage from './pages/dev/DbSchemaPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const { session, loading } = useAuthStore();
@@ -41,41 +44,44 @@ const App: React.FC = () => {
     const { session, signOut } = useAuthStore();
 
     return (
-        <HashRouter>
-            <Routes>
-                <Route path="/login" element={session ? <Navigate to="/dashboard" /> : <LoginPage />} />
-                <Route
-                    path="/*"
-                    element={
-                        <ProtectedRoute>
-                            <AppLayout onLogout={signOut}>
-                                <Routes>
-                                    <Route path="/dashboard" element={<DashboardPage />} />
-                                    <Route path="/onhand" element={<OnhandPage />} />
-                                    <Route path="/operations/gr" element={<GRPage />} />
-                                    <Route path="/operations/gi" element={<GIPage />} />
-                                    <Route path="/operations/ic" element={<ICPage />} />
-                                    <Route path="/operations/gt" element={<GTPage />} />
-                                    <Route path="/operations/pa" element={<PAPage />} />
-                                    <Route path="/goods/types" element={<GoodsTypesPage />} />
-                                    <Route path="/goods/models" element={<GoodsModelsPage />} />
-                                    <Route path="/master/organizations" element={<OrganizationsListPage />} />
-                                    <Route path="/master/branches" element={<BranchesListPage />} />
-                                    <Route path="/master/warehouses" element={<WarehousesListPage />} />
-                                    <Route path="/master/locations" element={<LocationsListPage />} />
-                                    <Route path="/master/uom-categories" element={<UomCategoriesListPage />} />
-                                    <Route path="/master/uoms" element={<UomsListPage />} />
-                                    <Route path="/master/partners" element={<PartnersListPage />} />
-                                    <Route path="/reports" element={<ReportsPage />} />
-                                    <Route path="/settings" element={<SettingsPage />} />
-                                    <Route path="/" element={<Navigate to="/dashboard" />} />
-                                </Routes>
-                            </AppLayout>
-                        </ProtectedRoute>
-                    }
-                />
-            </Routes>
-        </HashRouter>
+        <ThemeProvider theme={theme}>
+            <HashRouter>
+                <Routes>
+                    <Route path="/login" element={session ? <Navigate to="/dashboard" /> : <LoginPage />} />
+                    <Route
+                        path="/*"
+                        element={
+                            <ProtectedRoute>
+                                <AppLayout onLogout={signOut}>
+                                    <Routes>
+                                        <Route path="/dashboard" element={<DashboardPage />} />
+                                        <Route path="/onhand" element={<OnhandPage />} />
+                                        <Route path="/operations/gr" element={<GRPage />} />
+                                        <Route path="/operations/gi" element={<GIPage />} />
+                                        <Route path="/operations/ic" element={<ICPage />} />
+                                        <Route path="/operations/gt" element={<GTPage />} />
+                                        <Route path="/operations/pa" element={<PAPage />} />
+                                        <Route path="/goods/types" element={<GoodsTypesPage />} />
+                                        <Route path="/goods/models" element={<GoodsModelsPage />} />
+                                        <Route path="/master/organizations" element={<OrganizationsListPage />} />
+                                        <Route path="/master/branches" element={<BranchesListPage />} />
+                                        <Route path="/master/warehouses" element={<WarehousesListPage />} />
+                                        <Route path="/master/locations" element={<LocationsListPage />} />
+                                        <Route path="/master/uom-categories" element={<UomCategoriesListPage />} />
+                                        <Route path="/master/uoms" element={<UomsListPage />} />
+                                        <Route path="/master/partners" element={<PartnersListPage />} />
+                                        <Route path="/reports" element={<ReportsPage />} />
+                                        <Route path="/settings" element={<SettingsPage />} />
+                                        <Route path="/db-schema" element={<DbSchemaPage />} />
+                                        <Route path="/" element={<Navigate to="/dashboard" />} />
+                                    </Routes>
+                                </AppLayout>
+                            </ProtectedRoute>
+                        }
+                    />
+                </Routes>
+            </HashRouter>
+        </ThemeProvider>
     );
 };
 

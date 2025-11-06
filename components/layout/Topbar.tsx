@@ -25,19 +25,17 @@ const breadcrumbNameMap: { [key: string]: string } = {
     'ic': 'Inventory Count',
     'gt': 'Goods Transfer',
     'pa': 'Putaway',
+    'types': 'Goods Types',
+    'models': 'Goods Models',
+    'organizations': 'Organizations',
+    'branches': 'Branches',
+    'warehouses': 'Warehouses',
+    'locations': 'Locations',
+    'uom-categories': 'UoM Categories',
+    'uoms': 'Units of Measure',
+    'partners': 'Partners',
+    'db-schema': 'DB Schema',
 };
-
-const generateBreadcrumbs = (path: string) => {
-    const parts = path.split('/').filter(p => p);
-    const crumbs = parts.map((part, index) => {
-        const link = '/' + parts.slice(0, index + 1).join('/');
-        // Use the map for specific abbreviations, otherwise capitalize.
-        const name = breadcrumbNameMap[part] || part.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        return { name, link };
-    });
-    return crumbs;
-};
-
 
 const Topbar: React.FC<TopbarProps> = ({ onLogout }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -45,48 +43,53 @@ const Topbar: React.FC<TopbarProps> = ({ onLogout }) => {
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const user = useAuthStore((state) => state.user);
   
-  const breadcrumbs = generateBreadcrumbs(location.pathname);
-  const pageTitle = breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].name : 'Dashboard';
+  const pathParts = location.pathname.split('/').filter(p => p);
+  const pageTitle = pathParts.length > 0 
+    ? breadcrumbNameMap[pathParts[pathParts.length - 1]] || pathParts[pathParts.length - 1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) 
+    : 'Dashboard';
 
   return (
-    <div className="bg-white shadow-sm z-10">
-        {/* Main Topbar */}
-        <header className="h-16 flex items-center justify-between px-6">
-            <div className="flex items-center">
-                <button onClick={toggleSidebar} className="text-gray-500 focus:outline-none">
-                    <MenuIcon />
-                </button>
-                <div className="relative ml-4">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                        <SearchIcon />
-                    </span>
-                    <input
-                        type="text"
-                        placeholder="Search..."
-                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1976d2] focus:border-transparent"
-                    />
-                </div>
+    <header className="bg-white shadow-sm z-10 h-16 flex items-center justify-between px-6">
+        <div className="flex items-center space-x-4">
+            <button onClick={toggleSidebar} className="text-gray-500 focus:outline-none">
+                <MenuIcon />
+            </button>
+            <h1 className="text-xl font-semibold text-gray-800 hidden sm:block">{pageTitle}</h1>
+        </div>
+        
+        <div className="flex items-center space-x-4">
+            <div className="relative hidden md:block">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                    <SearchIcon />
+                </span>
+                <input
+                    type="text"
+                    placeholder="Search..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
             </div>
-            <div className="flex items-center space-x-4">
-                <button className="focus:outline-none">
-                    <VNFlagIcon />
+
+            <button className="focus:outline-none">
+                <VNFlagIcon />
+            </button>
+            <button className="relative text-gray-500 focus:outline-none">
+                <BellIcon />
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">3</span>
+            </button>
+            
+            <div className="relative">
+                <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center space-x-2 focus:outline-none p-1 rounded-lg">
+                    <img className="h-9 w-9 rounded-full" src={`https://ui-avatars.com/api/?name=${user?.email || 'User'}&background=random`} alt="User avatar" />
+                    <div className="text-left hidden md:block">
+                        <div className="font-semibold text-sm text-gray-800">{user?.email?.split('@')[0] || 'User'}</div>
+                        <div className="text-xs text-gray-500">Administrator</div>
+                    </div>
                 </button>
-                <button className="relative text-gray-500 focus:outline-none">
-                    <BellIcon />
-                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">3</span>
-                </button>
-                <div className="relative">
-                    <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center space-x-2 focus:outline-none bg-gray-100 p-1 rounded-lg">
-                        <img className="h-9 w-9 rounded-full" src={`https://ui-avatars.com/api/?name=${user?.email || 'User'}&background=random`} alt="User avatar" />
-                        <div className="text-left hidden md:block">
-                            <div className="font-semibold text-sm text-gray-800">Tri Nguyen</div>
-                        </div>
-                    </button>
-                    {dropdownOpen && (
-                        <div 
+                {dropdownOpen && (
+                    <div 
                         className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-xl z-20"
                         onMouseLeave={() => setDropdownOpen(false)}
-                        >
+                    >
                         <a href="#profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
                         <a href="#settings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
                         <div className="border-t border-gray-100"></div>
@@ -97,27 +100,11 @@ const Topbar: React.FC<TopbarProps> = ({ onLogout }) => {
                             <LogoutIcon />
                             Logout
                         </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </header>
-
-        {/* Breadcrumb Bar */}
-        <div className="h-12 bg-white border-t border-gray-200 flex items-center justify-between px-6">
-            <h1 className="text-lg font-semibold text-gray-800">{pageTitle}</h1>
-            <div className="text-sm text-gray-500 flex items-center space-x-2">
-                {breadcrumbs.map((crumb, index) => (
-                    <React.Fragment key={index}>
-                    {index > 0 && <span className="mx-1">/</span>}
-                    <Link to={crumb.link} className="hover:text-[#1976d2]">
-                        {crumb.name}
-                    </Link>
-                    </React.Fragment>
-                ))}
+                    </div>
+                )}
             </div>
         </div>
-    </div>
+    </header>
   );
 };
 
