@@ -18,43 +18,17 @@ const VNFlagIcon = () => (
     </svg>
 );
 
-
-const breadcrumbNameMap: { [key: string]: string } = {
-    'gr': 'Goods Receipt',
-    'gi': 'Goods Issue',
-    'ic': 'Inventory Count',
-    'gt': 'Goods Transfer',
-    'pa': 'Putaway',
-    'types': 'Goods Types',
-    'models': 'Goods Models',
-    'organizations': 'Organizations',
-    'branches': 'Branches',
-    'warehouses': 'Warehouses',
-    'locations': 'Locations',
-    'uom-categories': 'UoM Categories',
-    'uoms': 'Units of Measure',
-    'partners': 'Partners',
-    'db-schema': 'DB Schema',
-};
-
 const Topbar: React.FC<TopbarProps> = ({ onLogout }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const location = useLocation();
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const user = useAuthStore((state) => state.user);
-  
-  const pathParts = location.pathname.split('/').filter(p => p);
-  const pageTitle = pathParts.length > 0 
-    ? breadcrumbNameMap[pathParts[pathParts.length - 1]] || pathParts[pathParts.length - 1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) 
-    : 'Dashboard';
 
   return (
-    <header className="bg-white shadow-sm z-10 h-16 flex items-center justify-between px-6">
+    <header className="bg-white shadow-sm z-10 h-16 flex items-center justify-between px-6 flex-shrink-0">
         <div className="flex items-center space-x-4">
             <button onClick={toggleSidebar} className="text-gray-500 focus:outline-none">
                 <MenuIcon />
             </button>
-            <h1 className="text-xl font-semibold text-gray-800 hidden sm:block">{pageTitle}</h1>
         </div>
         
         <div className="flex items-center space-x-4">

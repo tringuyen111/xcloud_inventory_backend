@@ -2,240 +2,162 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
 import { UomCategory } from '../../types/supabase';
 import {
-  Button, Card, Input, DatePicker, Table, Modal, Form,
-  Row, Col, Typography, Space, App, Popover, Checkbox, Select, Menu, Dropdown, Tag
+    Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Modal, Form, Dropdown, Menu, Typography
 } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import {
-  PlusOutlined, EditOutlined, ExportOutlined, DownOutlined, MoreOutlined, StopOutlined, CheckCircleOutlined
+    PlusOutlined, ExportOutlined, ProfileOutlined, EllipsisOutlined, EyeOutlined, EditOutlined, DeleteOutlined
 } from '@ant-design/icons';
-import { format } from 'date-fns';
-import type { Dayjs } from 'dayjs';
+import useAuthStore from '../../stores/authStore';
 
-const { RangePicker } = DatePicker;
+const { Title, Text } = Typography;
 
-const UomCategoriesListPageContent: React.FC = () => {
-  const [categories, setCategories] = useState<UomCategory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<UomCategory | null>(null);
+const UomCategoriesListPage: React.FC = () => {
+    const [categories, setCategories] = useState<UomCategory[]>([]);
+    const [loading, setLoading] = useState(true);
+    const { notification, modal } = App.useApp();
+    const navigate = useNavigate();
+    const [form] = Form.useForm();
+    const user = useAuthStore((state) => state.user);
 
-  const [filters, setFilters] = useState({
-    search: '',
-    status: 'all',
-    updatedAt: null as [Dayjs, Dayjs] | null,
-  });
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const [visibleColumns, setVisibleColumns] = useState({
-    code: true,
-    name: true,
-    description: true,
-    status: true,
-    updated_at: true,
-  });
-
-  const [form] = Form.useForm();
-  const { notification, modal } = App.useApp();
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      let query = supabase.from('uom_categories').select('*');
-      if (filters.search) query = query.or(`name.ilike.%${filters.search}%,code.ilike.%${filters.search}%`);
-      if (filters.status !== 'all') {
-        query = query.eq('is_active', filters.status === 'active');
-      }
-      if (filters.updatedAt) {
-        query = query.gte('updated_at', filters.updatedAt[0].startOf('day').toISOString());
-        query = query.lte('updated_at', filters.updatedAt[1].endOf('day').toISOString());
-      }
-      const { data, error: queryError } = await query.order('id', { ascending: true });
-      if (queryError) throw queryError;
-      setCategories(data || []);
-    } catch (err: any) {
-      notification.error({ message: "Error loading data", description: err.message });
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, notification]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  const handleOpenModal = (record: UomCategory | null = null) => {
-    setEditingRecord(record);
-    form.setFieldsValue(record ? { ...record } : { code: '', name: '', is_active: true });
-    setIsModalOpen(true);
-  };
-  
-  const handleCancel = () => {
-    setIsModalOpen(false);
-    setEditingRecord(null);
-    form.resetFields();
-  };
-
-  const handleSave = async () => {
-    try {
-      const values = await form.validateFields();
-      const dataToSave = { ...values, updated_at: new Date().toISOString() };
-      if (editingRecord) {
-        const { error } = await supabase.from('uom_categories').update(dataToSave).eq('id', editingRecord.id);
-        if (error) throw error;
-        notification.success({ message: 'Category updated successfully' });
-      } else {
-        const { error } = await supabase.from('uom_categories').insert(dataToSave);
-        if (error) throw error;
-        notification.success({ message: 'Category created successfully' });
-      }
-      handleCancel();
-      loadData();
-    } catch (err: any) {
-      notification.error({ message: 'Save failed', description: err.message });
-    }
-  };
-
-  const handleToggleStatus = (record: UomCategory) => {
-    modal.confirm({
-      title: `Confirm ${record.is_active ? 'Deactivation' : 'Activation'}`,
-      content: `Are you sure you want to ${record.is_active ? 'deactivate' : 'activate'} "${record.name}"?`,
-      onOk: async () => {
+    const fetchData = useCallback(async () => {
+        setLoading(true);
         try {
-          const { error } = await supabase
-            .from('uom_categories')
-            .update({ is_active: !record.is_active, updated_at: new Date().toISOString() })
-            .eq('id', record.id);
-          if (error) throw error;
-          notification.success({ message: `Status updated successfully` });
-          loadData();
-        } catch (err: any) {
-          notification.error({ message: 'Status update failed', description: err.message });
+            let query = supabase.from('uom_categories').select('*');
+            if (searchTerm) query = query.or(`name.ilike.%${searchTerm}%,code.ilike.%${searchTerm}%`);
+            if (statusFilter !== 'all') query = query.eq('is_active', statusFilter === 'active');
+            const { data, error } = await query.order('name', { ascending: true });
+            if (error) throw error;
+            setCategories(data || []);
+        } catch (error: any) {
+            notification.error({ message: "Error fetching UoM categories", description: error.message });
+        } finally {
+            setLoading(false);
         }
-      },
-    });
-  };
+    }, [notification, searchTerm, statusFilter]);
 
-  const handleFilterChange = (key: string, value: any) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  };
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
-  const columns = [
-    { title: 'Code', dataIndex: 'code', key: 'code', hidden: !visibleColumns.code },
-    { title: 'Name', dataIndex: 'name', key: 'name', hidden: !visibleColumns.name },
-    { title: 'Description', dataIndex: 'description', key: 'description', hidden: !visibleColumns.description },
-    { 
-      title: 'Status', dataIndex: 'is_active', key: 'status', hidden: !visibleColumns.status,
-      render: (isActive: boolean) => <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'Active' : 'Inactive'}</Tag>
-    },
-    {
-      title: 'Updated At', dataIndex: 'updated_at', key: 'updated_at', hidden: !visibleColumns.updated_at,
-      render: (text: string, record: UomCategory) => format(new Date(text || record.created_at!), 'yyyy-MM-dd HH:mm')
-    },
-    {
-      title: 'Actions', key: 'actions', fixed: 'right' as const, width: 100,
-      render: (_: any, record: UomCategory) => {
-        const menu = (
-          <Menu>
-            <Menu.Item key="1" icon={<EditOutlined />} onClick={() => handleOpenModal(record)}>
-              Edit
-            </Menu.Item>
-            <Menu.Item
-              key="2"
-              icon={record.is_active ? <StopOutlined /> : <CheckCircleOutlined />}
-              onClick={() => handleToggleStatus(record)}
-            >
-              {record.is_active ? 'Deactivate' : 'Activate'}
-            </Menu.Item>
-          </Menu>
-        );
-        return (
-          <Dropdown overlay={menu} trigger={['click']}>
-            <Button icon={<MoreOutlined />} size="small" />
-          </Dropdown>
-        );
-      }
-    },
-  ].filter(col => !col.hidden);
+    const handleCreate = () => {
+        form.resetFields();
+        setIsModalOpen(true);
+    };
 
-  const columnMenu = (
-    <div style={{ padding: 8, display: 'flex', flexDirection: 'column' }}>
-      {Object.keys(visibleColumns).map(key => (
-        <Checkbox
-          key={key}
-          checked={visibleColumns[key as keyof typeof visibleColumns]}
-          onChange={e => setVisibleColumns(prev => ({ ...prev, [key]: e.target.checked }))}
-        >
-          {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-        </Checkbox>
-      ))}
-    </div>
-  );
+    const handleCancel = () => setIsModalOpen(false);
 
-  return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Row justify="space-between" align="middle">
-        <Col>
-          <Typography.Title level={3} style={{ margin: 0 }}>UoM Categories</Typography.Title>
-          <Typography.Text type="secondary">Manage unit of measure categories</Typography.Text>
-        </Col>
-        <Col>
-          <Space>
-            <Button icon={<ExportOutlined />}>Export</Button>
-            <Popover content={columnMenu} title="Visible Columns" trigger="click">
-              <Button>Columns <DownOutlined /></Button>
-            </Popover>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>Add New</Button>
-          </Space>
-        </Col>
-      </Row>
+    const handleSave = async () => {
+        try {
+            setIsSaving(true);
+            const values = await form.validateFields();
+            const { error } = await supabase.from('uom_categories').insert({ ...values, created_by: user?.id, updated_by: user?.id }).select();
+            if (error) throw error;
+            notification.success({ message: "Category created successfully" });
+            setIsModalOpen(false);
+            fetchData();
+        } catch (error: any) {
+            notification.error({ message: "Failed to create category", description: error.message });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+    
+    const handleDelete = (id: number) => {
+        modal.confirm({
+            title: 'Are you sure?',
+            content: 'This action cannot be undone.',
+            okText: 'Yes, delete it',
+            okType: 'danger',
+            onOk: async () => {
+                try {
+                    const { error } = await supabase.from('uom_categories').delete().eq('id', id);
+                    if (error) throw error;
+                    notification.success({ message: 'Category deleted successfully' });
+                    fetchData();
+                } catch (error: any) {
+                    notification.error({ message: 'Failed to delete', description: error.message });
+                }
+            },
+        });
+    };
 
-      <Card>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={8}><Input.Search placeholder="Search name/code..." onSearch={val => handleFilterChange('search', val)} allowClear /></Col>
-          <Col xs={24} sm={12} md={8}>
-            <Select defaultValue="all" style={{ width: '100%' }} onChange={value => handleFilterChange('status', value)}>
-              <Select.Option value="all">All Status</Select.Option>
-              <Select.Option value="active">Active</Select.Option>
-              <Select.Option value="inactive">Inactive</Select.Option>
-            </Select>
-          </Col>
-          <Col xs={24} sm={12} md={8}><RangePicker style={{ width: '100%' }} onChange={dates => handleFilterChange('updatedAt', dates)} /></Col>
-        </Row>
-      </Card>
+    const actionMenu = (record: UomCategory) => (
+        <Menu>
+            <Menu.Item key="1" icon={<EyeOutlined />} onClick={() => navigate(`/master/uom-categories/${record.id}`)}>View</Menu.Item>
+            <Menu.Item key="2" icon={<EditOutlined />} onClick={() => navigate(`/master/uom-categories/${record.id}`)}>Edit</Menu.Item>
+            <Menu.Divider />
+            <Menu.Item key="3" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)}>Delete</Menu.Item>
+        </Menu>
+    );
 
-      <Card bodyStyle={{ padding: 0 }}>
-        <Table dataSource={categories} columns={columns} loading={loading} rowKey="id" size="middle" scroll={{ x: 800 }}/>
-      </Card>
+    const columns = [
+        { title: 'Code', dataIndex: 'code', key: 'code', sorter: (a: UomCategory, b: UomCategory) => a.code.localeCompare(b.code) },
+        { title: 'Name', dataIndex: 'name', key: 'name', sorter: (a: UomCategory, b: UomCategory) => a.name.localeCompare(b.name) },
+        { title: 'Status', dataIndex: 'is_active', key: 'is_active', render: (isActive: boolean) => <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'Active' : 'Inactive'}</Tag> },
+        {
+            title: 'Actions',
+            key: 'action',
+             align: 'center' as const,
+            render: (_: any, record: UomCategory) => (
+                 <Dropdown overlay={actionMenu(record)} trigger={['click']}>
+                    <Button type="text" icon={<EllipsisOutlined />} />
+                </Dropdown>
+            ),
+        },
+    ];
 
-      <Modal 
-        title={editingRecord ? 'Edit UoM Category' : 'Add New UoM Category'} 
-        open={isModalOpen} 
-        onOk={handleSave} 
-        okText={editingRecord ? 'Save' : 'Create'}
-        onCancel={handleCancel} 
-        width={600} 
-        confirmLoading={loading} 
-        destroyOnClose
-      >
-        <Form form={form} layout="vertical" name="uom_category_form" style={{ marginTop: 24 }}>
-          <Form.Item name="code" label="Code" rules={[{ required: true }]}><Input disabled={!!editingRecord} /></Form.Item>
-          <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item>
-          <Form.Item name="description" label="Description"><Input.TextArea rows={3} /></Form.Item>
-          {editingRecord && (
-             <Form.Item name="is_active" label="Status" rules={[{ required: true }]}>
-                <Select>
-                  <Select.Option value={true}>Active</Select.Option>
-                  <Select.Option value={false}>Inactive</Select.Option>
-                </Select>
-              </Form.Item>
-          )}
-        </Form>
-      </Modal>
-    </Space>
-  );
+    return (
+        <Card>
+            <Row justify="space-between" align="middle" className="mb-4">
+                 <Col>
+                    <Title level={4} style={{ margin: 0 }}>UoM Categories</Title>
+                    <Text type="secondary">Manage unit of measure categories.</Text>
+                 </Col>
+                <Col>
+                    <Space>
+                        <Button icon={<ExportOutlined />} onClick={() => notification.info({message: 'Export function is not yet implemented.'})}>Export</Button>
+                        <Button icon={<ProfileOutlined />} onClick={() => notification.info({message: 'Column customization is not yet implemented.'})}>Columns</Button>
+                        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>Add New</Button>
+                    </Space>
+                </Col>
+            </Row>
+
+             <div className="p-4 mb-6 bg-gray-50 rounded-lg">
+                <Row gutter={16} align="bottom">
+                    <Col><Form.Item label="Search" style={{ marginBottom: 0 }}><Input.Search placeholder="Search by name or code..." onSearch={setSearchTerm} allowClear style={{width: 250}} /></Form.Item></Col>
+                    <Col><Form.Item label="Status" style={{ marginBottom: 0 }}><Select value={statusFilter} onChange={setStatusFilter} style={{ width: 120 }}><Select.Option value="all">All</Select.Option><Select.Option value="active">Active</Select.Option><Select.Option value="inactive">Inactive</Select.Option></Select></Form.Item></Col>
+                </Row>
+            </div>
+
+            <Table
+                columns={columns}
+                dataSource={categories}
+                rowKey="id"
+                loading={loading}
+                pagination={{ pageSize: 10 }}
+                onRow={(record) => ({ onDoubleClick: () => navigate(`/master/uom-categories/${record.id}`)})}
+            />
+
+            <Modal title="Create UoM Category" open={isModalOpen} onOk={handleSave} onCancel={handleCancel} confirmLoading={isSaving} okText="Save">
+                <Form form={form} layout="vertical" name="create_uom_cat_form" className="mt-6">
+                    <Form.Item name="code" label="Code" rules={[{ required: true }]}><Input /></Form.Item>
+                    <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item>
+                    <Form.Item name="is_active" label="Status" initialValue={true}><Select><Select.Option value={true}>Active</Select.Option><Select.Option value={false}>Inactive</Select.Option></Select></Form.Item>
+                    <Form.Item name="description" label="Notes"><Input.TextArea rows={3} /></Form.Item>
+                </Form>
+            </Modal>
+        </Card>
+    );
 };
 
-const UomCategoriesListPage: React.FC = () => (
-    <App><UomCategoriesListPageContent /></App>
+const UomCategoriesListPageWrapper: React.FC = () => (
+    <App><UomCategoriesListPage /></App>
 );
 
-export default UomCategoriesListPage;
+export default UomCategoriesListPageWrapper;

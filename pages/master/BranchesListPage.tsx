@@ -2,307 +2,179 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
 import { Branch, Organization } from '../../types/supabase';
 import {
-  Button, Card, Input, Select, DatePicker, Table, Tag, Modal, Form,
-  Row, Col, Typography, Space, App, Popover, Checkbox, Dropdown, Menu
+    Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Modal, Form, Dropdown, Menu, Typography
 } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import {
-  PlusOutlined, EditOutlined, ExportOutlined, DownOutlined, MoreOutlined, CheckCircleOutlined, StopOutlined
+    PlusOutlined, ExportOutlined, ProfileOutlined, EllipsisOutlined, EyeOutlined, EditOutlined, DeleteOutlined
 } from '@ant-design/icons';
-import { format } from 'date-fns';
-import type { Dayjs } from 'dayjs';
+import useAuthStore from '../../stores/authStore';
 
-const { RangePicker } = DatePicker;
+const { Title, Text } = Typography;
 
-type BranchWithOrg = Branch & { organization?: { name: string } };
+type BranchWithOrg = Branch & { organizations: { name: string } | null };
 
-const BranchesListPageContent: React.FC = () => {
-  const [branches, setBranches] = useState<BranchWithOrg[]>([]);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<BranchWithOrg | null>(null);
-  
-  const [filters, setFilters] = useState({
-    search: '',
-    status: 'all',
-    orgId: 'all',
-    updatedAt: null as [Dayjs, Dayjs] | null,
-  });
+const BranchesListPage: React.FC = () => {
+    const [branches, setBranches] = useState<BranchWithOrg[]>([]);
+    const [loading, setLoading] = useState(true);
+    const { notification, modal } = App.useApp();
+    const navigate = useNavigate();
+    const [form] = Form.useForm();
+    const user = useAuthStore((state) => state.user);
+    
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [organizations, setOrganizations] = useState<Organization[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const [visibleColumns, setVisibleColumns] = useState({
-    code: true,
-    name: true,
-    organization: true,
-    status: true,
-    updated_at: true,
-  });
-
-  const [form] = Form.useForm();
-  const { notification, modal } = App.useApp();
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data: orgData, error: orgError } = await supabase.from('organizations').select('id, name').eq('is_active', true);
-      if (orgError) throw orgError;
-      setOrganizations(orgData || []);
-
-      let query = supabase.from('branches').select('*, organization:organizations(name)');
-
-      if (filters.search) {
-        query = query.or(`name.ilike.%${filters.search}%,code.ilike.%${filters.search}%`);
-      }
-      if (filters.status !== 'all') {
-        query = query.eq('is_active', filters.status === 'active');
-      }
-      if (filters.orgId !== 'all') {
-        query = query.eq('org_id', filters.orgId);
-      }
-      if (filters.updatedAt) {
-        query = query.gte('updated_at', filters.updatedAt[0].startOf('day').toISOString());
-        query = query.lte('updated_at', filters.updatedAt[1].endOf('day').toISOString());
-      }
-
-      const { data, error: queryError } = await query.order('id', { ascending: true });
-
-      if (queryError) throw queryError;
-      setBranches(data || []);
-    } catch (err: any) {
-      notification.error({ message: "Error loading data", description: err.message });
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, notification]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  const handleOpenModal = (record: BranchWithOrg | null = null) => {
-    setEditingRecord(record);
-    form.setFieldsValue(record ? { ...record } : { code: '', name: '', is_active: true });
-    setIsModalOpen(true);
-  };
-
-  const handleCancel = () => {
-    setIsModalOpen(false);
-    setEditingRecord(null);
-    form.resetFields();
-  };
-
-  const handleSave = async () => {
-    try {
-      const values = await form.validateFields();
-      const dataToSave = {
-        ...values,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (editingRecord) {
-        const { error } = await supabase.from('branches').update(dataToSave).eq('id', editingRecord.id);
-        if (error) throw error;
-        notification.success({ message: 'Branch updated successfully' });
-      } else {
-        const { error } = await supabase.from('branches').insert(dataToSave);
-        if (error) throw error;
-        notification.success({ message: 'Branch created successfully' });
-      }
-      handleCancel();
-      loadData();
-    } catch (err: any) {
-      notification.error({ message: 'Save failed', description: err.message });
-    }
-  };
-  
-  const handleToggleStatus = (record: Branch) => {
-    modal.confirm({
-      title: `Confirm ${record.is_active ? 'Deactivation' : 'Activation'}`,
-      content: `Are you sure you want to ${record.is_active ? 'deactivate' : 'activate'} the branch "${record.name}"?`,
-      onOk: async () => {
+    const fetchData = useCallback(async () => {
+        setLoading(true);
         try {
-          const { error } = await supabase
-            .from('branches')
-            .update({ is_active: !record.is_active, updated_at: new Date().toISOString() })
-            .eq('id', record.id);
-          if (error) throw error;
-          notification.success({ message: `Branch status updated successfully` });
-          loadData();
-        } catch (err: any) {
-          notification.error({ message: 'Status update failed', description: err.message });
+            let query = supabase.from('branches').select('*, organizations(name)');
+            if (searchTerm) query = query.or(`name.ilike.%${searchTerm}%,code.ilike.%${searchTerm}%`);
+            if (statusFilter !== 'all') query = query.eq('is_active', statusFilter === 'active');
+            const { data, error } = await query.order('name', { ascending: true });
+            if (error) throw error;
+            setBranches(data as BranchWithOrg[] || []);
+        } catch (error: any) {
+            notification.error({ message: "Error fetching branches", description: error.message });
+        } finally {
+            setLoading(false);
         }
-      },
-    });
-  };
+    }, [notification, searchTerm, statusFilter]);
 
-  const handleFilterChange = (key: string, value: any) => {
-    setFilters(prev => ({...prev, [key]: value}));
-  }
+    const fetchOrganizations = useCallback(async () => {
+        try {
+            const { data, error } = await supabase.from('organizations').select('id, name').eq('is_active', true);
+            if (error) throw error;
+            setOrganizations(data || []);
+        } catch (error: any) {
+            notification.error({ message: "Error fetching organizations", description: error.message });
+        }
+    }, [notification]);
 
-  const columns = [
-    { title: 'Code', dataIndex: 'code', key: 'code', hidden: !visibleColumns.code },
-    { title: 'Name', dataIndex: 'name', key: 'name', hidden: !visibleColumns.name },
-    { title: 'Organization', dataIndex: ['organization', 'name'], key: 'organization', hidden: !visibleColumns.organization },
-    { 
-      title: 'Status', dataIndex: 'is_active', key: 'status', hidden: !visibleColumns.status,
-      render: (isActive: boolean) => (
-        <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'Active' : 'Inactive'}</Tag>
-      )
-    },
-    { 
-      title: 'Updated At', dataIndex: 'updated_at', key: 'updated_at', hidden: !visibleColumns.updated_at,
-      render: (text: string | null, record: Branch) => format(new Date(text || record.created_at), 'yyyy-MM-dd HH:mm')
-    },
-    {
-      title: 'Actions', key: 'actions', fixed: 'right' as const, width: 100,
-      render: (_: any, record: BranchWithOrg) => {
-        const menu = (
-          <Menu>
-            <Menu.Item key="1" icon={<EditOutlined />} onClick={() => handleOpenModal(record)}>
-              Edit
-            </Menu.Item>
-            <Menu.Item
-              key="2"
-              icon={record.is_active ? <StopOutlined /> : <CheckCircleOutlined />}
-              onClick={() => handleToggleStatus(record)}
-            >
-              {record.is_active ? 'Deactivate' : 'Activate'}
-            </Menu.Item>
-          </Menu>
-        );
+    useEffect(() => {
+        fetchData();
+        fetchOrganizations();
+    }, [fetchData, fetchOrganizations]);
 
-        return (
-          <Dropdown overlay={menu} trigger={['click']}>
-            <Button icon={<MoreOutlined />} size="small" />
-          </Dropdown>
-        );
-      }
-    },
-  ].filter(col => !col.hidden);
-  
-  const columnMenu = (
-    <div style={{ padding: 8, display: 'flex', flexDirection: 'column' }}>
-      {Object.keys(visibleColumns).map(key => (
-        <Checkbox
-          key={key}
-          checked={visibleColumns[key as keyof typeof visibleColumns]}
-          onChange={e => setVisibleColumns(prev => ({ ...prev, [key]: e.target.checked }))}
-        >
-          {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-        </Checkbox>
-      ))}
-    </div>
-  );
+    const handleCreate = () => {
+        form.resetFields();
+        setIsModalOpen(true);
+    };
 
-  return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Row justify="space-between" align="middle">
-          <Col>
-              <Typography.Title level={3} style={{ margin: 0 }}>Branches</Typography.Title>
-              <Typography.Text type="secondary">Manage branch information</Typography.Text>
-          </Col>
-          <Col>
-              <Space>
-                  <Button icon={<ExportOutlined />}>Export</Button>
-                  <Popover content={columnMenu} title="Visible Columns" trigger="click">
-                    <Button>Columns <DownOutlined /></Button>
-                  </Popover>
-                  <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>
-                      Add New
-                  </Button>
-              </Space>
-          </Col>
-      </Row>
+    const handleCancel = () => setIsModalOpen(false);
 
-      <Card>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={6}>
-            <Input.Search placeholder="Search by name or code..." onSearch={value => handleFilterChange('search', value)} allowClear />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <Select
-              style={{ width: '100%' }}
-              placeholder="Filter by Organization"
-              onChange={value => handleFilterChange('orgId', value)}
-              allowClear
-            >
-              <Select.Option value="all">All Organizations</Select.Option>
-              {organizations.map(org => <Select.Option key={org.id} value={org.id}>{org.name}</Select.Option>)}
-            </Select>
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <Select
-              defaultValue="all"
-              style={{ width: '100%' }}
-              onChange={value => handleFilterChange('status', value)}
-            >
-              <Select.Option value="all">All Status</Select.Option>
-              <Select.Option value="active">Active</Select.Option>
-              <Select.Option value="inactive">Inactive</Select.Option>
-            </Select>
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-             <RangePicker style={{ width: '100%' }} onChange={dates => handleFilterChange('updatedAt', dates)} />
-          </Col>
-        </Row>
-      </Card>
-      
-      <Card bodyStyle={{ padding: 0 }}>
-        <Table
-          dataSource={branches}
-          columns={columns}
-          loading={loading}
-          rowKey="id"
-          size="middle"
-          scroll={{ x: 1000 }}
-        />
-      </Card>
+    const handleSave = async () => {
+        try {
+            setIsSaving(true);
+            const values = await form.validateFields();
+            const { error } = await supabase.from('branches').insert({ ...values, created_by: user?.id, updated_by: user?.id }).select();
+            if (error) throw error;
+            notification.success({ message: "Branch created successfully" });
+            setIsModalOpen(false);
+            fetchData();
+        } catch (error: any) {
+            notification.error({ message: "Failed to create branch", description: error.message });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+    
+    const handleDelete = (id: number) => {
+        modal.confirm({
+            title: 'Are you sure?',
+            content: 'This action cannot be undone.',
+            okText: 'Yes, delete it',
+            okType: 'danger',
+            onOk: async () => {
+                try {
+                    const { error } = await supabase.from('branches').delete().eq('id', id);
+                    if (error) throw error;
+                    notification.success({ message: 'Branch deleted successfully' });
+                    fetchData();
+                } catch (error: any) {
+                    notification.error({ message: 'Failed to delete', description: error.message });
+                }
+            },
+        });
+    };
 
-      <Modal
-        title={editingRecord ? 'Edit Branch' : 'Add New Branch'}
-        open={isModalOpen}
-        onOk={handleSave}
-        okText={editingRecord ? 'Save' : 'Create'}
-        onCancel={handleCancel}
-        width={600}
-        confirmLoading={loading}
-        destroyOnClose
-      >
-        <Form form={form} layout="vertical" name="branch_form" style={{ marginTop: 24 }}>
-            <Form.Item name="org_id" label="Organization" rules={[{ required: true }]}>
-              <Select>
-                {organizations.map(org => <Select.Option key={org.id} value={org.id}>{org.name}</Select.Option>)}
-              </Select>
-            </Form.Item>
-            <Form.Item name="code" label="Code" rules={[{ required: true }]}>
-              <Input disabled={!!editingRecord} />
-            </Form.Item>
-            <Form.Item name="name" label="Name" rules={[{ required: true }]}>
-              <Input />
-            </Form.Item>
-            <Form.Item name="address" label="Address">
-              <Input.TextArea rows={3} />
-            </Form.Item>
-            <Form.Item name="description" label="Description">
-              <Input.TextArea rows={3} />
-            </Form.Item>
-            {editingRecord && (
-              <Form.Item name="is_active" label="Status" rules={[{ required: true }]}>
-                <Select>
-                  <Select.Option value={true}>Active</Select.Option>
-                  <Select.Option value={false}>Inactive</Select.Option>
-                </Select>
-              </Form.Item>
-            )}
-        </Form>
-      </Modal>
-    </Space>
-  );
+    const actionMenu = (record: Branch) => (
+        <Menu>
+            <Menu.Item key="1" icon={<EyeOutlined />} onClick={() => navigate(`/master/branches/${record.id}`)}>View</Menu.Item>
+            <Menu.Item key="2" icon={<EditOutlined />} onClick={() => navigate(`/master/branches/${record.id}`)}>Edit</Menu.Item>
+            <Menu.Divider />
+            <Menu.Item key="3" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)}>Delete</Menu.Item>
+        </Menu>
+    );
+
+    const columns = [
+        { title: 'Code', dataIndex: 'code', key: 'code', sorter: (a: Branch, b: Branch) => a.code.localeCompare(b.code) },
+        { title: 'Name', dataIndex: 'name', key: 'name', sorter: (a: Branch, b: Branch) => a.name.localeCompare(b.name) },
+        { title: 'Organization', dataIndex: 'organizations', key: 'organization', render: (org: { name: string } | null) => org?.name || '-', sorter: (a: BranchWithOrg, b: BranchWithOrg) => (a.organizations?.name || '').localeCompare(b.organizations?.name || '') },
+        { title: 'Status', dataIndex: 'is_active', key: 'is_active', render: (isActive: boolean) => <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'Active' : 'Inactive'}</Tag> },
+        {
+            title: 'Actions',
+            key: 'action',
+            align: 'center' as const,
+            render: (_: any, record: Branch) => (
+                 <Dropdown overlay={actionMenu(record)} trigger={['click']}>
+                    <Button type="text" icon={<EllipsisOutlined />} />
+                </Dropdown>
+            ),
+        },
+    ];
+
+    return (
+        <Card>
+            <Row justify="space-between" align="middle" className="mb-4">
+                <Col>
+                    <Title level={4} style={{ margin: 0 }}>Branches</Title>
+                    <Text type="secondary">Manage all branches in the system.</Text>
+                </Col>
+                <Col>
+                    <Space>
+                        <Button icon={<ExportOutlined />} onClick={() => notification.info({message: 'Export function is not yet implemented.'})}>Export</Button>
+                        <Button icon={<ProfileOutlined />} onClick={() => notification.info({message: 'Column customization is not yet implemented.'})}>Columns</Button>
+                        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>Add New</Button>
+                    </Space>
+                </Col>
+            </Row>
+
+            <div className="p-4 mb-6 bg-gray-50 rounded-lg">
+                 <Row gutter={16} align="bottom">
+                    <Col><Form.Item label="Search" style={{ marginBottom: 0 }}><Input.Search placeholder="Search by name or code..." onSearch={setSearchTerm} allowClear style={{width: 250}} /></Form.Item></Col>
+                    <Col><Form.Item label="Status" style={{ marginBottom: 0 }}><Select value={statusFilter} onChange={setStatusFilter} style={{ width: 120 }}><Select.Option value="all">All</Select.Option><Select.Option value="active">Active</Select.Option><Select.Option value="inactive">Inactive</Select.Option></Select></Form.Item></Col>
+                </Row>
+            </div>
+
+            <Table
+                columns={columns}
+                dataSource={branches}
+                rowKey="id"
+                loading={loading}
+                pagination={{ pageSize: 10 }}
+                onRow={(record) => ({ onDoubleClick: () => navigate(`/master/branches/${record.id}`)})}
+            />
+
+            <Modal title="Create Branch" open={isModalOpen} onOk={handleSave} onCancel={handleCancel} confirmLoading={isSaving} okText="Save">
+                <Form form={form} layout="vertical" name="create_branch_form" className="mt-6">
+                    <Form.Item name="org_id" label="Organization" rules={[{ required: true }]}><Select options={organizations.map(org => ({ label: org.name, value: org.id }))} /></Form.Item>
+                    <Form.Item name="code" label="Code" rules={[{ required: true }]}><Input /></Form.Item>
+                    <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item>
+                    <Form.Item name="is_active" label="Status" initialValue={true}><Select><Select.Option value={true}>Active</Select.Option><Select.Option value={false}>Inactive</Select.Option></Select></Form.Item>
+                    <Form.Item name="address" label="Address"><Input.TextArea rows={3} /></Form.Item>
+                    <Form.Item name="description" label="Notes"><Input.TextArea rows={3} /></Form.Item>
+                </Form>
+            </Modal>
+        </Card>
+    );
 };
 
-const BranchesListPage: React.FC = () => (
-    <App>
-        <BranchesListPageContent />
-    </App>
+const BranchesListPageWrapper: React.FC = () => (
+    <App><BranchesListPage /></App>
 );
 
-export default BranchesListPage;
+export default BranchesListPageWrapper;

@@ -1,6 +1,7 @@
 import React from 'react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import Breadcrumb from './Breadcrumb';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -24,6 +25,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onLogout }) => {
         <Topbar onLogout={onLogout} />
         <div className="flex-1 flex flex-col overflow-y-auto">
             <main className="flex-1 p-6">
+              <Breadcrumb />
               {children}
             </main>
             <Footer />

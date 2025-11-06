@@ -25,6 +25,18 @@ import AppLayout from './components/layout/AppLayout';
 import useAuthStore from './stores/authStore';
 import DbSchemaPage from './pages/dev/DbSchemaPage';
 
+// Import Detail Pages
+import OrganizationDetailPage from './pages/master/OrganizationDetailPage';
+import BranchDetailPage from './pages/master/BranchDetailPage';
+import WarehouseDetailPage from './pages/master/WarehouseDetailPage';
+import LocationDetailPage from './pages/master/LocationDetailPage';
+import UomCategoryDetailPage from './pages/master/UomCategoryDetailPage';
+import UomDetailPage from './pages/master/UomDetailPage';
+import PartnerDetailPage from './pages/master/PartnerDetailPage';
+import GoodsTypeDetailPage from './pages/goods/GoodsTypeDetailPage';
+import GoodsModelDetailPage from './pages/goods/GoodsModelDetailPage';
+
+
 const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const { session, loading } = useAuthStore();
   
@@ -85,15 +97,27 @@ const App: React.FC = () => {
                                         <Route path="/operations/ic" element={<ICPage />} />
                                         <Route path="/operations/gt" element={<GTPage />} />
                                         <Route path="/operations/pa" element={<PAPage />} />
+                                        
                                         <Route path="/goods/types" element={<GoodsTypesListPage />} />
+                                        <Route path="/goods/types/:id" element={<GoodsTypeDetailPage />} />
                                         <Route path="/goods/models" element={<GoodsModelsListPage />} />
+                                        <Route path="/goods/models/:id" element={<GoodsModelDetailPage />} />
+
                                         <Route path="/master/organizations" element={<OrganizationsListPage />} />
+                                        <Route path="/master/organizations/:id" element={<OrganizationDetailPage />} />
                                         <Route path="/master/branches" element={<BranchesListPage />} />
+                                        <Route path="/master/branches/:id" element={<BranchDetailPage />} />
                                         <Route path="/master/warehouses" element={<WarehousesListPage />} />
+                                        <Route path="/master/warehouses/:id" element={<WarehouseDetailPage />} />
                                         <Route path="/master/locations" element={<LocationsListPage />} />
+                                        <Route path="/master/locations/:id" element={<LocationDetailPage />} />
                                         <Route path="/master/uom-categories" element={<UomCategoriesListPage />} />
+                                        <Route path="/master/uom-categories/:id" element={<UomCategoryDetailPage />} />
                                         <Route path="/master/uoms" element={<UomsListPage />} />
+                                        <Route path="/master/uoms/:id" element={<UomDetailPage />} />
                                         <Route path="/master/partners" element={<PartnersListPage />} />
+                                        <Route path="/master/partners/:id" element={<PartnerDetailPage />} />
+
                                         <Route path="/reports" element={<ReportsPage />} />
                                         <Route path="/settings" element={<SettingsPage />} />
                                         <Route path="/db-schema" element={<DbSchemaPage />} />

@@ -14,34 +14,40 @@ export interface Database {
           address: string | null
           code: string
           created_at: string
+          created_by: string | null
           description: string | null
           id: number
           is_active: boolean
           name: string
           org_id: number
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           address?: string | null
           code: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: number
           is_active?: boolean
           name: string
           org_id: number
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           address?: string | null
           code?: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: number
           is_active?: boolean
           name?: string
           org_id?: number
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -57,37 +63,46 @@ export interface Database {
           base_uom_id: number
           code: string
           created_at: string
+          created_by: string | null
           description: string | null
           goods_type_id: number
           id: number
+          image_urls: string[] | null
           is_active: boolean
           name: string
           tracking_type: Database["public"]["Enums"]["tracking_type_enum"]
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           base_uom_id: number
           code: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           goods_type_id: number
           id?: number
+          image_urls?: string[] | null
           is_active?: boolean
           name: string
           tracking_type: Database["public"]["Enums"]["tracking_type_enum"]
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           base_uom_id?: number
           code?: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           goods_type_id?: number
           id?: number
+          image_urls?: string[] | null
           is_active?: boolean
           name?: string
           tracking_type?: Database["public"]["Enums"]["tracking_type_enum"]
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -108,29 +123,35 @@ export interface Database {
         Row: {
           code: string
           created_at: string
+          created_by: string | null
           description: string | null
           id: number
           is_active: boolean
           name: string
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           code: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: number
           is_active?: boolean
           name: string
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           code?: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: number
           is_active?: boolean
           name?: string
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -140,11 +161,13 @@ export interface Database {
           constrained_goods_model_ids: number[] | null
           constraint_type: Database["public"]["Enums"]["location_constraint_type"]
           created_at: string
+          created_by: string | null
           description: string | null
           id: number
           is_active: boolean
           name: string
           updated_at: string | null
+          updated_by: string | null
           warehouse_id: number
         }
         Insert: {
@@ -152,11 +175,13 @@ export interface Database {
           constrained_goods_model_ids?: number[] | null
           constraint_type?: Database["public"]["Enums"]["location_constraint_type"]
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: number
           is_active?: boolean
           name: string
           updated_at?: string | null
+          updated_by?: string | null
           warehouse_id: number
         }
         Update: {
@@ -164,11 +189,13 @@ export interface Database {
           constrained_goods_model_ids?: number[] | null
           constraint_type?: Database["public"]["Enums"]["location_constraint_type"]
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: number
           is_active?: boolean
           name?: string
           updated_at?: string | null
+          updated_by?: string | null
           warehouse_id?: number
         }
         Relationships: [
@@ -185,6 +212,7 @@ export interface Database {
           address: string | null
           code: string
           created_at: string
+          created_by: string | null
           email: string | null
           id: number
           is_active: boolean
@@ -193,11 +221,13 @@ export interface Database {
           phone: string | null
           tax_id: string | null
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           address?: string | null
           code: string
           created_at?: string
+          created_by?: string | null
           email?: string | null
           id?: number
           is_active?: boolean
@@ -206,11 +236,13 @@ export interface Database {
           phone?: string | null
           tax_id?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           address?: string | null
           code?: string
           created_at?: string
+          created_by?: string | null
           email?: string | null
           id?: number
           is_active?: boolean
@@ -219,6 +251,7 @@ export interface Database {
           phone?: string | null
           tax_id?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -227,6 +260,7 @@ export interface Database {
           address: string | null
           code: string
           created_at: string
+          created_by: string | null
           email: string | null
           id: number
           is_active: boolean
@@ -237,11 +271,13 @@ export interface Database {
           phone: string | null
           tax_id: string | null
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           address?: string | null
           code: string
           created_at?: string
+          created_by?: string | null
           email?: string | null
           id?: number
           is_active?: boolean
@@ -252,11 +288,13 @@ export interface Database {
           phone?: string | null
           tax_id?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           address?: string | null
           code?: string
           created_at?: string
+          created_by?: string | null
           email?: string | null
           id?: number
           is_active?: boolean
@@ -267,6 +305,7 @@ export interface Database {
           phone?: string | null
           tax_id?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -281,29 +320,35 @@ export interface Database {
         Row: {
           code: string
           created_at: string
+          created_by: string | null
           description: string | null
           id: number
           is_active: boolean
           name: string
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           code: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: number
           is_active?: boolean
           name: string
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           code?: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: number
           is_active?: boolean
           name?: string
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -312,34 +357,40 @@ export interface Database {
           category_id: number
           code: string
           created_at: string
+          created_by: string | null
           id: number
           is_active: boolean
           is_base: boolean
           name: string
           ratio_to_base: number
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           category_id: number
           code: string
           created_at?: string
+          created_by?: string | null
           id?: number
           is_active?: boolean
           is_base?: boolean
           name: string
           ratio_to_base?: number
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           category_id?: number
           code?: string
           created_at?: string
+          created_by?: string | null
           id?: number
           is_active?: boolean
           is_base?: boolean
           name?: string
           ratio_to_base?: number
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -355,33 +406,39 @@ export interface Database {
           branch_id: number
           code: string
           created_at: string
+          created_by: string | null
           description: string | null
           id: number
           is_active: boolean
           name: string
           updated_at: string | null
+          updated_by: string | null
           warehouse_type: Database["public"]["Enums"]["warehouse_type"]
         }
         Insert: {
           branch_id: number
           code: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: number
           is_active?: boolean
           name: string
           updated_at?: string | null
+          updated_by?: string | null
           warehouse_type?: Database["public"]["Enums"]["warehouse_type"]
         }
         Update: {
           branch_id?: number
           code?: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: number
           is_active?: boolean
           name?: string
           updated_at?: string | null
+          updated_by?: string | null
           warehouse_type?: Database["public"]["Enums"]["warehouse_type"]
         }
         Relationships: [
