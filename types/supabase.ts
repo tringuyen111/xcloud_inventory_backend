@@ -1,4 +1,3 @@
-
 // types/supabase.ts
 
 /**
@@ -90,3 +89,25 @@ export interface Partner {
   created_at?: string;
   updated_at?: string;
 };
+
+export interface GoodsType {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface GoodsModel {
+  id: number;
+  goods_type_id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  specifications?: Record<string, any> | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string | null;
+}

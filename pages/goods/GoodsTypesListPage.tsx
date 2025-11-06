@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
-import { Organization } from '../../types/supabase';
+import { GoodsType } from '../../types/supabase';
 import {
   Button, Card, Input, Select, DatePicker, Table, Tag, Modal, Form,
   Row, Col, Typography, Space, App, Popover, Checkbox, Dropdown, Menu
@@ -13,11 +13,11 @@ import type { Dayjs } from 'dayjs';
 
 const { RangePicker } = DatePicker;
 
-const OrganizationsListPageContent: React.FC = () => {
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
+const GoodsTypesListPageContent: React.FC = () => {
+  const [goodsTypes, setGoodsTypes] = useState<GoodsType[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<Organization | null>(null);
+  const [editingRecord, setEditingRecord] = useState<GoodsType | null>(null);
   
   const [filters, setFilters] = useState({
     search: '',
@@ -28,9 +28,7 @@ const OrganizationsListPageContent: React.FC = () => {
   const [visibleColumns, setVisibleColumns] = useState({
     code: true,
     name: true,
-    tax_id: true,
-    phone: true,
-    email: true,
+    description: true,
     status: true,
     updated_at: true,
   });
@@ -41,7 +39,7 @@ const OrganizationsListPageContent: React.FC = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase.from('organizations').select('*');
+      let query = supabase.from('goods_types').select('*');
 
       if (filters.search) {
         query = query.or(`name.ilike.%${filters.search}%,code.ilike.%${filters.search}%`);
@@ -57,7 +55,7 @@ const OrganizationsListPageContent: React.FC = () => {
       const { data, error: queryError } = await query.order('id', { ascending: true });
 
       if (queryError) throw queryError;
-      setOrganizations(data || []);
+      setGoodsTypes(data || []);
     } catch (err: any) {
       notification.error({ message: "Error loading data", description: err.message });
     } finally {
@@ -69,9 +67,9 @@ const OrganizationsListPageContent: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  const handleOpenModal = (record: Organization | null = null) => {
+  const handleOpenModal = (record: GoodsType | null = null) => {
     setEditingRecord(record);
-    form.setFieldsValue(record ? { ...record } : { code: '', name: '', is_active: true });
+    form.setFieldsValue(record ? { ...record } : { code: '', name: '', description: '', is_active: true });
     setIsModalOpen(true);
   };
 
@@ -90,13 +88,13 @@ const OrganizationsListPageContent: React.FC = () => {
       };
 
       if (editingRecord) {
-        const { error } = await supabase.from('organizations').update(dataToSave).eq('id', editingRecord.id);
+        const { error } = await supabase.from('goods_types').update(dataToSave).eq('id', editingRecord.id);
         if (error) throw error;
-        notification.success({ message: 'Organization updated successfully' });
+        notification.success({ message: 'Goods Type updated successfully' });
       } else {
-        const { error } = await supabase.from('organizations').insert(dataToSave);
+        const { error } = await supabase.from('goods_types').insert(dataToSave);
         if (error) throw error;
-        notification.success({ message: 'Organization created successfully' });
+        notification.success({ message: 'Goods Type created successfully' });
       }
       handleCancel();
       loadData();
@@ -105,18 +103,18 @@ const OrganizationsListPageContent: React.FC = () => {
     }
   };
 
-  const handleToggleStatus = (record: Organization) => {
+  const handleToggleStatus = (record: GoodsType) => {
     modal.confirm({
       title: `Confirm ${record.is_active ? 'Deactivation' : 'Activation'}`,
-      content: `Are you sure you want to ${record.is_active ? 'deactivate' : 'activate'} the organization "${record.name}"?`,
+      content: `Are you sure you want to ${record.is_active ? 'deactivate' : 'activate'} the goods type "${record.name}"?`,
       onOk: async () => {
         try {
           const { error } = await supabase
-            .from('organizations')
+            .from('goods_types')
             .update({ is_active: !record.is_active, updated_at: new Date().toISOString() })
             .eq('id', record.id);
           if (error) throw error;
-          notification.success({ message: `Organization status updated successfully` });
+          notification.success({ message: `Goods Type status updated successfully` });
           loadData();
         } catch (err: any) {
           notification.error({ message: 'Status update failed', description: err.message });
@@ -132,9 +130,7 @@ const OrganizationsListPageContent: React.FC = () => {
   const columns = [
     { title: 'Code', dataIndex: 'code', key: 'code', hidden: !visibleColumns.code },
     { title: 'Name', dataIndex: 'name', key: 'name', hidden: !visibleColumns.name },
-    { title: 'Tax ID', dataIndex: 'tax_id', key: 'tax_id', hidden: !visibleColumns.tax_id },
-    { title: 'Phone', dataIndex: 'phone', key: 'phone', hidden: !visibleColumns.phone },
-    { title: 'Email', dataIndex: 'email', key: 'email', hidden: !visibleColumns.email },
+    { title: 'Description', dataIndex: 'description', key: 'description', hidden: !visibleColumns.description },
     { 
       title: 'Status', dataIndex: 'is_active', key: 'status', hidden: !visibleColumns.status,
       render: (isActive: boolean) => (
@@ -143,11 +139,11 @@ const OrganizationsListPageContent: React.FC = () => {
     },
     { 
       title: 'Updated At', dataIndex: 'updated_at', key: 'updated_at', hidden: !visibleColumns.updated_at,
-      render: (text: string | null, record: Organization) => format(new Date(text || record.created_at), 'yyyy-MM-dd HH:mm')
+      render: (text: string | null, record: GoodsType) => format(new Date(text || record.created_at), 'yyyy-MM-dd HH:mm')
     },
     {
       title: 'Actions', key: 'actions', fixed: 'right' as const, width: 100,
-      render: (_: any, record: Organization) => {
+      render: (_: any, record: GoodsType) => {
         const menu = (
           <Menu>
             <Menu.Item key="1" icon={<EditOutlined />} onClick={() => handleOpenModal(record)}>
@@ -190,8 +186,8 @@ const OrganizationsListPageContent: React.FC = () => {
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Row justify="space-between" align="middle">
           <Col>
-              <Typography.Title level={3} style={{ margin: 0 }}>Organizations</Typography.Title>
-              <Typography.Text type="secondary">Manage organization information</Typography.Text>
+              <Typography.Title level={3} style={{ margin: 0 }}>Goods Types</Typography.Title>
+              <Typography.Text type="secondary">Manage types of goods</Typography.Text>
           </Col>
           <Col>
               <Space>
@@ -233,82 +229,52 @@ const OrganizationsListPageContent: React.FC = () => {
       
       <Card bodyStyle={{ padding: 0 }}>
         <Table
-          dataSource={organizations}
+          dataSource={goodsTypes}
           columns={columns}
           loading={loading}
           rowKey="id"
           size="middle"
-          scroll={{ x: 1300 }}
+          scroll={{ x: 1000 }}
         />
       </Card>
 
       <Modal
-        title={editingRecord ? 'Edit Organization' : 'Add New Organization'}
+        title={editingRecord ? 'Edit Goods Type' : 'Add New Goods Type'}
         open={isModalOpen}
         onOk={handleSave}
         onCancel={handleCancel}
-        width={800}
+        width={600}
         confirmLoading={loading}
         destroyOnClose
       >
-        <Form form={form} layout="vertical" name="organization_form" style={{ marginTop: 24 }}>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="code" label="Code" rules={[{ required: true }]}>
-                <Input disabled={!!editingRecord} />
+        <Form form={form} layout="vertical" name="goods_type_form" style={{ marginTop: 24 }}>
+            <Form.Item name="code" label="Code" rules={[{ required: true }]}>
+              <Input disabled={!!editingRecord} />
+            </Form.Item>
+            <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="description" label="Description">
+              <Input.TextArea rows={4} />
+            </Form.Item>
+            {editingRecord && (
+              <Form.Item name="is_active" label="Status" rules={[{ required: true }]}>
+                <Select>
+                  <Select.Option value={true}>Active</Select.Option>
+                  <Select.Option value={false}>Inactive</Select.Option>
+                </Select>
               </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="name" label="Name" rules={[{ required: true }]}>
-                <Input />
-              </Form.Item>
-            </Col>
-             <Col span={12}>
-              <Form.Item name="tax_id" label="Tax ID">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="phone" label="Phone">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="email" label="Email" rules={[{ type: 'email' }]}>
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              {editingRecord && (
-                <Form.Item name="is_active" label="Status" rules={[{ required: true }]}>
-                  <Select>
-                    <Select.Option value={true}>Active</Select.Option>
-                    <Select.Option value={false}>Inactive</Select.Option>
-                  </Select>
-                </Form.Item>
-              )}
-            </Col>
-             <Col span={24}>
-              <Form.Item name="address" label="Address">
-                <Input.TextArea rows={3} />
-              </Form.Item>
-            </Col>
-            <Col span={24}>
-              <Form.Item name="notes" label="Notes">
-                <Input.TextArea rows={3} />
-              </Form.Item>
-            </Col>
-          </Row>
+            )}
         </Form>
       </Modal>
     </Space>
   );
 };
 
-const OrganizationsListPage: React.FC = () => (
+const GoodsTypesListPage: React.FC = () => (
     <App>
-        <OrganizationsListPageContent />
+        <GoodsTypesListPageContent />
     </App>
 );
 
-export default OrganizationsListPage;
+export default GoodsTypesListPage;

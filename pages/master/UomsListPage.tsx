@@ -2,40 +2,48 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
 import { Uom, UomCategory } from '../../types/supabase';
 import {
-  Paper, Typography, Stack, TextField, FormControl, InputLabel, Select, MenuItem, Button, Menu, Grid,
-  CircularProgress, Alert, TableContainer, Table, TableHead, TableRow, TableCell, TableBody,
-  Chip, IconButton, Dialog, DialogTitle, DialogContent, DialogActions
-} from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, FileDownload as FileDownloadIcon, ViewColumn as ViewColumnIcon } from '@mui/icons-material';
+  Button, Card, Input, Select, DatePicker, Table, Tag, Modal, Form,
+  Row, Col, Typography, Space, App, Popover, Checkbox, InputNumber, Switch
+} from 'antd';
+import {
+  PlusOutlined, EditOutlined, ExportOutlined, DownOutlined
+} from '@ant-design/icons';
 import { format } from 'date-fns';
+import type { Dayjs } from 'dayjs';
 
-const UomsListPage: React.FC = () => {
-  // FIX: Updated state type to correctly include the joined 'category' object. This resolves a destructuring error in handleSave.
-  const [uoms, setUoms] = useState<(Uom & { category?: { name: string } })[]>([]);
+const { RangePicker } = DatePicker;
+
+type UomWithCategory = Uom & { category?: { name: string } };
+
+const UomsListPageContent: React.FC = () => {
+  const [uoms, setUoms] = useState<UomWithCategory[]>([]);
   const [categories, setCategories] = useState<UomCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  // FIX: Updated state type to correctly include the joined 'category' object.
-  const [editingUom, setEditingUom] = useState<(Uom & { category?: { name: string } }) | null>(null);
-  // FIX: Updated state type to correctly include the joined 'category' object.
-  const [formData, setFormData] = useState<Partial<Uom & { category?: { name: string } }>>({});
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<UomWithCategory | null>(null);
 
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const [columnAnchorEl, setColumnAnchorEl] = useState<null | HTMLElement>(null);
+  const [filters, setFilters] = useState({
+    search: '',
+    categoryId: 'all',
+    isBase: 'all',
+    updatedAt: null as [Dayjs, Dayjs] | null,
+  });
+  
   const [visibleColumns, setVisibleColumns] = useState({
     code: true,
     name: true,
     category: true,
     is_base: true,
-    ratio: true,
+    ratio_to_base: true,
     updated_at: true,
   });
 
+  const [form] = Form.useForm();
+  const { notification } = App.useApp();
+  const isBaseUnit = Form.useWatch('is_base', form);
+
   const loadData = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const { data: catData, error: catError } = await supabase.from('uom_categories').select('id, name');
       if (catError) throw catError;
@@ -43,174 +51,156 @@ const UomsListPage: React.FC = () => {
 
       let query = supabase.from('uoms').select('*, category:uom_categories(name)');
 
-      if (searchTerm) query = query.ilike('name', `%${searchTerm}%`);
+      if (filters.search) query = query.or(`name.ilike.%${filters.search}%,code.ilike.%${filters.search}%`);
+      if (filters.categoryId !== 'all') query = query.eq('category_id', filters.categoryId);
+      if (filters.isBase !== 'all') query = query.eq('is_base', filters.isBase === 'yes');
+      if (filters.updatedAt) {
+        query = query.gte('updated_at', filters.updatedAt[0].startOf('day').toISOString());
+        query = query.lte('updated_at', filters.updatedAt[1].endOf('day').toISOString());
+      }
       
       const { data, error: queryError } = await query.order('id', { ascending: true });
       if (queryError) throw queryError;
       setUoms(data || []);
     } catch (err: any) {
-      setError(err.message);
+      notification.error({ message: "Error loading data", description: err.message });
     } finally {
       setLoading(false);
     }
-  }, [searchTerm]);
+  }, [filters, notification]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // FIX: Updated parameter type to correctly include the joined 'category' object.
-  const handleOpenDialog = (uom: (Uom & { category?: { name: string } }) | null = null) => {
-    setEditingUom(uom);
-    setFormData(uom ? { ...uom } : { code: '', name: '', is_base: false, ratio_to_base: 1 });
-    setDialogOpen(true);
+  const handleOpenModal = (record: UomWithCategory | null = null) => {
+    setEditingRecord(record);
+    form.setFieldsValue(record ? { ...record } : { code: '', name: '', is_base: false, ratio_to_base: 1 });
+    setIsModalOpen(true);
   };
 
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
-    setEditingUom(null);
-    setFormData({});
+  const handleCancel = () => {
+    setIsModalOpen(false);
+    setEditingRecord(null);
+    form.resetFields();
   };
 
   const handleSave = async () => {
-    if (!formData.code || !formData.name || !formData.category_id) {
-      setError("Category, Code, and Name are required.");
-      return;
-    }
-
     try {
-      // FIX: Added default value to destructuring to handle cases where 'category' is not in formData, resolving a potential error.
-      const { category, ...dataToSave } = {
-        ...formData,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (editingUom) {
-        const { error: updateError } = await supabase.from('uoms').update(dataToSave).eq('id', editingUom.id);
-        if (updateError) throw updateError;
-      } else {
-        const { error: createError } = await supabase.from('uoms').insert(dataToSave);
-        if (createError) throw createError;
+      const values = await form.validateFields();
+      // FIX: Removed destructuring of 'category' which does not exist in form values.
+      const dataToSave = { ...values, updated_at: new Date().toISOString() };
+      if (dataToSave.is_base) {
+        dataToSave.ratio_to_base = 1;
       }
-      handleCloseDialog();
+      
+      if (editingRecord) {
+        const { error } = await supabase.from('uoms').update(dataToSave).eq('id', editingRecord.id);
+        if (error) throw error;
+        notification.success({ message: 'UoM updated successfully' });
+      } else {
+        const { error } = await supabase.from('uoms').insert(dataToSave);
+        if (error) throw error;
+        notification.success({ message: 'UoM created successfully' });
+      }
+      handleCancel();
       loadData();
     } catch (err: any) {
-      setError(err.message);
+      notification.error({ message: 'Save failed', description: err.message });
     }
   };
   
-  const handleColumnToggle = (column: keyof typeof visibleColumns) => {
-    setVisibleColumns(prev => ({ ...prev, [column]: !prev[column] }));
+  const handleFilterChange = (key: string, value: any) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
   };
 
+  const columns = [
+    { title: 'Code', dataIndex: 'code', key: 'code', hidden: !visibleColumns.code },
+    { title: 'Name', dataIndex: 'name', key: 'name', hidden: !visibleColumns.name },
+    { title: 'Category', dataIndex: ['category', 'name'], key: 'category', hidden: !visibleColumns.category },
+    { title: 'Is Base Unit', dataIndex: 'is_base', key: 'is_base', hidden: !visibleColumns.is_base, render: (isBase: boolean) => isBase && <Tag color="blue">Base</Tag> },
+    { title: 'Ratio to Base', dataIndex: 'ratio_to_base', key: 'ratio_to_base', hidden: !visibleColumns.ratio_to_base },
+    {
+      title: 'Updated At', dataIndex: 'updated_at', key: 'updated_at', hidden: !visibleColumns.updated_at,
+      render: (text: string, record: Uom) => format(new Date(text || record.created_at!), 'yyyy-MM-dd HH:mm')
+    },
+    {
+      title: 'Actions', key: 'actions', fixed: 'right' as const, width: 100,
+      render: (_: any, record: UomWithCategory) => (
+        <Button icon={<EditOutlined />} onClick={() => handleOpenModal(record)} size="small">Edit</Button>
+      )
+    },
+  ].filter(col => !col.hidden);
+  
+  const columnMenu = (
+    <div style={{ padding: 8, display: 'flex', flexDirection: 'column' }}>
+      {Object.keys(visibleColumns).map(key => (
+        <Checkbox
+          key={key}
+          checked={visibleColumns[key as keyof typeof visibleColumns]}
+          onChange={e => setVisibleColumns(prev => ({ ...prev, [key]: e.target.checked }))}
+        >
+          {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+        </Checkbox>
+      ))}
+    </div>
+  );
+
   return (
-    <Paper sx={{ p: 3 }}>
-      <Typography variant="h5" gutterBottom component="h1">Units of Measure</Typography>
-      <Typography color="text.secondary" paragraph>Manage UoMs for all products</Typography>
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <Row justify="space-between" align="middle">
+        <Col>
+          <Typography.Title level={3} style={{ margin: 0 }}>Units of Measure</Typography.Title>
+          <Typography.Text type="secondary">Manage UoMs for all products</Typography.Text>
+        </Col>
+        <Col>
+          <Space>
+            <Button icon={<ExportOutlined />}>Export</Button>
+            <Popover content={columnMenu} title="Visible Columns" trigger="click">
+              <Button>Columns <DownOutlined /></Button>
+            </Popover>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>Add New</Button>
+          </Space>
+        </Col>
+      </Row>
 
-      <Stack direction="row" spacing={2} mb={3} alignItems="center" flexWrap="wrap">
-        <TextField label="Search" variant="outlined" size="small" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} sx={{ flexGrow: 1, minWidth: '200px' }} />
-        <Button variant="outlined" startIcon={<FileDownloadIcon />}>Export</Button>
-        <Button variant="outlined" startIcon={<ViewColumnIcon />} onClick={(e) => setColumnAnchorEl(e.currentTarget)}>Columns</Button>
-        <Menu anchorEl={columnAnchorEl} open={Boolean(columnAnchorEl)} onClose={() => setColumnAnchorEl(null)}>
-          {Object.keys(visibleColumns).map((column) => (
-            <MenuItem key={column} onClick={() => handleColumnToggle(column as keyof typeof visibleColumns)}>
-               {column.replace(/_/g, ' ').toUpperCase()}
-            </MenuItem>
-          ))}
-        </Menu>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>Add New</Button>
-      </Stack>
+      <Card>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={12} md={6}><Input.Search placeholder="Search name/code..." onSearch={val => handleFilterChange('search', val)} allowClear /></Col>
+          <Col xs={24} sm={12} md={6}><Select style={{ width: '100%' }} placeholder="Filter by Category" onChange={val => handleFilterChange('categoryId', val)} allowClear>
+            <Select.Option value="all">All Categories</Select.Option>
+            {categories.map(c => <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>)}
+          </Select></Col>
+          <Col xs={24} sm={12} md={6}><Select defaultValue="all" style={{ width: '100%' }} onChange={val => handleFilterChange('isBase', val)}>
+            <Select.Option value="all">All Units</Select.Option>
+            <Select.Option value="yes">Base Unit</Select.Option>
+            <Select.Option value="no">Not Base Unit</Select.Option>
+          </Select></Col>
+          <Col xs={24} sm={12} md={6}><RangePicker style={{ width: '100%' }} onChange={dates => handleFilterChange('updatedAt', dates)} /></Col>
+        </Row>
+      </Card>
 
-      {loading && <CircularProgress />}
-      {error && <Alert severity="error" sx={{ my: 2 }}>{error}</Alert>}
+      <Card bodyStyle={{ padding: 0 }}>
+        <Table dataSource={uoms} columns={columns} loading={loading} rowKey="id" size="middle" scroll={{ x: 1000 }} />
+      </Card>
 
-      {!loading && !error && (
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                {visibleColumns.code && <TableCell>Code</TableCell>}
-                {visibleColumns.name && <TableCell>Name</TableCell>}
-                {visibleColumns.category && <TableCell>Category</TableCell>}
-                {visibleColumns.is_base && <TableCell>Is Base Unit</TableCell>}
-                {visibleColumns.ratio && <TableCell>Ratio to Base</TableCell>}
-                {visibleColumns.updated_at && <TableCell>Updated At</TableCell>}
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {uoms.map((uom) => (
-                <TableRow key={uom.id} hover>
-                  {visibleColumns.code && <TableCell>{uom.code}</TableCell>}
-                  {visibleColumns.name && <TableCell>{uom.name}</TableCell>}
-                  {visibleColumns.category && <TableCell>{uom.category?.name || 'N/A'}</TableCell>}
-                  {visibleColumns.is_base && <TableCell>{uom.is_base && <Chip label="Base" color="primary" size="small" />}</TableCell>}
-                  {visibleColumns.ratio && <TableCell>{uom.ratio_to_base}</TableCell>}
-                  {visibleColumns.updated_at && <TableCell>{format(new Date(uom.updated_at || uom.created_at), 'yyyy-MM-dd HH:mm')}</TableCell>}
-                  <TableCell>
-                    <IconButton onClick={() => handleOpenDialog(uom)} size="small"><EditIcon /></IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
-
-      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>{editingUom ? 'Edit UoM' : 'Add New UoM'}</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required>
-                <InputLabel>Category</InputLabel>
-                <Select value={formData.category_id || ''} label="Category" onChange={(e) => setFormData({ ...formData, category_id: Number(e.target.value) })}>
-                  {categories.map(c => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField label="Code" fullWidth value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: e.target.value })} required disabled={!!editingUom} />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField label="Name" fullWidth value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Is Base Unit</InputLabel>
-                  <Select
-                    value={formData.is_base ? 'true' : 'false'}
-                    label="Is Base Unit"
-                    onChange={(e) => {
-                        const isBase = e.target.value === 'true';
-                        setFormData({ ...formData, is_base: isBase, ratio_to_base: isBase ? 1 : formData.ratio_to_base });
-                    }}
-                  >
-                    <MenuItem value="true">Yes</MenuItem>
-                    <MenuItem value="false">No</MenuItem>
-                  </Select>
-                </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField 
-                label="Ratio to Base" 
-                type="number" 
-                fullWidth 
-                value={formData.ratio_to_base || 1} 
-                onChange={(e) => setFormData({ ...formData, ratio_to_base: Number(e.target.value) })} 
-                disabled={formData.is_base}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions sx={{ p: '16px 24px' }}>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSave} variant="contained">Save</Button>
-        </DialogActions>
-      </Dialog>
-    </Paper>
+      <Modal title={editingRecord ? 'Edit UoM' : 'Add New UoM'} open={isModalOpen} onOk={handleSave} onCancel={handleCancel} width={700} confirmLoading={loading} destroyOnClose>
+        <Form form={form} layout="vertical" name="uom_form" style={{ marginTop: 24 }} initialValues={{ ratio_to_base: 1, is_base: false }}>
+          <Row gutter={16}>
+            <Col span={12}><Form.Item name="category_id" label="Category" rules={[{ required: true }]}><Select>{categories.map(c => <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>)}</Select></Form.Item></Col>
+            <Col span={12}><Form.Item name="code" label="Code" rules={[{ required: true }]}><Input disabled={!!editingRecord} /></Form.Item></Col>
+            <Col span={12}><Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col span={12}><Form.Item name="is_base" label="Is Base Unit" valuePropName="checked"><Switch /></Form.Item></Col>
+            <Col span={12}><Form.Item name="ratio_to_base" label="Ratio to Base"><InputNumber style={{ width: '100%' }} min={0} disabled={isBaseUnit} /></Form.Item></Col>
+          </Row>
+        </Form>
+      </Modal>
+    </Space>
   );
 };
+
+const UomsListPage: React.FC = () => (
+    <App><UomsListPageContent /></App>
+);
 
 export default UomsListPage;

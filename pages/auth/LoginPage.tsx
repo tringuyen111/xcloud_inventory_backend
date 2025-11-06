@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
 import { supabase } from '../../services/supabase';
+import { Form, Input, Button, Alert, Typography, Card } from 'antd';
+import { MailOutlined, LockOutlined } from '@ant-design/icons';
 
 const LoginPage: React.FC = () => {
-    const [email, setEmail] = useState('nguyenmanhtri2907@gmail.com');
-    const [password, setPassword] = useState('nmt29072002');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleLogin = async (values: any) => {
         setIsLoading(true);
         setError('');
         
         const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
+            email: values.email,
+            password: values.password,
         });
 
         if (error) {
@@ -26,52 +25,41 @@ const LoginPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-[#f5f7fb] flex items-center justify-center">
-            <div className="bg-white p-10 rounded-xl shadow-lg w-full max-w-md">
-                <h1 className="text-3xl font-bold text-center text-gray-800 mb-2">Inventory XCloud</h1>
-                <p className="text-center text-gray-500 mb-8">Sign in to your account</p>
+            <Card className="w-full max-w-md shadow-lg">
+                <div className="text-center mb-8">
+                    <Typography.Title level={2} className="text-gray-800">Inventory XCloud</Typography.Title>
+                    <Typography.Text type="secondary">Sign in to your account</Typography.Text>
+                </div>
                 
-                {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">{error}</div>}
+                {error && <Alert message={error} type="error" showIcon closable className="mb-4" />}
 
-                <form onSubmit={handleLogin}>
-                    <div className="mb-4">
-                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
-                            Email
-                        </label>
-                        <input
-                            id="email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            placeholder="admin@xcloud.com"
-                            required
-                        />
-                    </div>
-                    <div className="mb-6">
-                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
-                            Password
-                        </label>
-                        <input
-                            id="password"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 mb-3 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            placeholder="password"
-                            required
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:shadow-outline w-full disabled:bg-indigo-300 transition-colors duration-200"
-                        >
-                            {isLoading ? 'Signing In...' : 'Sign In'}
-                        </button>
-                    </div>
-                </form>
-            </div>
+                <Form
+                    name="login"
+                    initialValues={{ email: 'nguyenmanhtri2907@gmail.com', password: 'nmt29072002' }}
+                    onFinish={handleLogin}
+                    size="large"
+                >
+                    <Form.Item
+                        name="email"
+                        rules={[{ required: true, type: 'email', message: 'Please input a valid Email!' }]}
+                    >
+                        <Input prefix={<MailOutlined />} placeholder="Email" />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="password"
+                        rules={[{ required: true, message: 'Please input your Password!' }]}
+                    >
+                        <Input.Password prefix={<LockOutlined />} placeholder="Password" />
+                    </Form.Item>
+                    
+                    <Form.Item>
+                        <Button type="primary" htmlType="submit" loading={isLoading} className="w-full">
+                            Sign In
+                        </Button>
+                    </Form.Item>
+                </Form>
+            </Card>
         </div>
     );
 };

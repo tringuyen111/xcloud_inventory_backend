@@ -2,24 +2,28 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
 import { UomCategory } from '../../types/supabase';
 import {
-  Paper, Typography, Stack, TextField, Button, Menu, MenuItem,
-  CircularProgress, Alert, TableContainer, Table, TableHead, TableRow, TableCell, TableBody,
-  IconButton, Dialog, DialogTitle, DialogContent, DialogActions
-} from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, FileDownload as FileDownloadIcon, ViewColumn as ViewColumnIcon } from '@mui/icons-material';
+  Button, Card, Input, DatePicker, Table, Modal, Form,
+  Row, Col, Typography, Space, App, Popover, Checkbox
+} from 'antd';
+import {
+  PlusOutlined, EditOutlined, ExportOutlined, DownOutlined
+} from '@ant-design/icons';
 import { format } from 'date-fns';
+import type { Dayjs } from 'dayjs';
 
-const UomCategoriesListPage: React.FC = () => {
+const { RangePicker } = DatePicker;
+
+const UomCategoriesListPageContent: React.FC = () => {
   const [categories, setCategories] = useState<UomCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<UomCategory | null>(null);
-  const [formData, setFormData] = useState<Partial<UomCategory>>({});
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<UomCategory | null>(null);
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({
+    search: '',
+    updatedAt: null as [Dayjs, Dayjs] | null,
+  });
 
-  const [columnAnchorEl, setColumnAnchorEl] = useState<null | HTMLElement>(null);
   const [visibleColumns, setVisibleColumns] = useState({
     code: true,
     name: true,
@@ -27,135 +31,140 @@ const UomCategoriesListPage: React.FC = () => {
     updated_at: true,
   });
 
+  const [form] = Form.useForm();
+  const { notification } = App.useApp();
+
   const loadData = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       let query = supabase.from('uom_categories').select('*');
-      if (searchTerm) query = query.ilike('name', `%${searchTerm}%`);
+      if (filters.search) query = query.or(`name.ilike.%${filters.search}%,code.ilike.%${filters.search}%`);
+      if (filters.updatedAt) {
+        query = query.gte('updated_at', filters.updatedAt[0].startOf('day').toISOString());
+        query = query.lte('updated_at', filters.updatedAt[1].endOf('day').toISOString());
+      }
       const { data, error: queryError } = await query.order('id', { ascending: true });
       if (queryError) throw queryError;
       setCategories(data || []);
     } catch (err: any) {
-      setError(err.message);
+      notification.error({ message: "Error loading data", description: err.message });
     } finally {
       setLoading(false);
     }
-  }, [searchTerm]);
+  }, [filters, notification]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const handleOpenDialog = (cat: UomCategory | null = null) => {
-    setEditingCategory(cat);
-    setFormData(cat ? { ...cat } : { code: '', name: '' });
-    setDialogOpen(true);
+  const handleOpenModal = (record: UomCategory | null = null) => {
+    setEditingRecord(record);
+    form.setFieldsValue(record ? { ...record } : { code: '', name: '' });
+    setIsModalOpen(true);
   };
-
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
-    setEditingCategory(null);
-    setFormData({});
+  
+  const handleCancel = () => {
+    setIsModalOpen(false);
+    setEditingRecord(null);
+    form.resetFields();
   };
 
   const handleSave = async () => {
-    if (!formData.code || !formData.name) {
-      setError("Code and Name are required.");
-      return;
-    }
-
     try {
-      const dataToSave = {
-        ...formData,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (editingCategory) {
-        const { error: updateError } = await supabase.from('uom_categories').update(dataToSave).eq('id', editingCategory.id);
-        if (updateError) throw updateError;
+      const values = await form.validateFields();
+      const dataToSave = { ...values, updated_at: new Date().toISOString() };
+      if (editingRecord) {
+        const { error } = await supabase.from('uom_categories').update(dataToSave).eq('id', editingRecord.id);
+        if (error) throw error;
+        notification.success({ message: 'Category updated successfully' });
       } else {
-        const { error: createError } = await supabase.from('uom_categories').insert(dataToSave);
-        if (createError) throw createError;
+        const { error } = await supabase.from('uom_categories').insert(dataToSave);
+        if (error) throw error;
+        notification.success({ message: 'Category created successfully' });
       }
-      handleCloseDialog();
+      handleCancel();
       loadData();
     } catch (err: any) {
-      setError(err.message);
+      notification.error({ message: 'Save failed', description: err.message });
     }
   };
 
-  const handleColumnToggle = (column: keyof typeof visibleColumns) => {
-    setVisibleColumns(prev => ({ ...prev, [column]: !prev[column] }));
+  const handleFilterChange = (key: string, value: any) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
   };
 
+  const columns = [
+    { title: 'Code', dataIndex: 'code', key: 'code', hidden: !visibleColumns.code },
+    { title: 'Name', dataIndex: 'name', key: 'name', hidden: !visibleColumns.name },
+    { title: 'Description', dataIndex: 'description', key: 'description', hidden: !visibleColumns.description },
+    {
+      title: 'Updated At', dataIndex: 'updated_at', key: 'updated_at', hidden: !visibleColumns.updated_at,
+      render: (text: string, record: UomCategory) => format(new Date(text || record.created_at!), 'yyyy-MM-dd HH:mm')
+    },
+    {
+      title: 'Actions', key: 'actions', fixed: 'right' as const, width: 100,
+      render: (_: any, record: UomCategory) => (
+        <Button icon={<EditOutlined />} onClick={() => handleOpenModal(record)} size="small">Edit</Button>
+      )
+    },
+  ].filter(col => !col.hidden);
+
+  const columnMenu = (
+    <div style={{ padding: 8, display: 'flex', flexDirection: 'column' }}>
+      {Object.keys(visibleColumns).map(key => (
+        <Checkbox
+          key={key}
+          checked={visibleColumns[key as keyof typeof visibleColumns]}
+          onChange={e => setVisibleColumns(prev => ({ ...prev, [key]: e.target.checked }))}
+        >
+          {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+        </Checkbox>
+      ))}
+    </div>
+  );
+
   return (
-    <Paper sx={{ p: 3 }}>
-      <Typography variant="h5" gutterBottom component="h1">UoM Categories</Typography>
-      <Typography color="text.secondary" paragraph>Manage unit of measure categories</Typography>
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <Row justify="space-between" align="middle">
+        <Col>
+          <Typography.Title level={3} style={{ margin: 0 }}>UoM Categories</Typography.Title>
+          <Typography.Text type="secondary">Manage unit of measure categories</Typography.Text>
+        </Col>
+        <Col>
+          <Space>
+            <Button icon={<ExportOutlined />}>Export</Button>
+            <Popover content={columnMenu} title="Visible Columns" trigger="click">
+              <Button>Columns <DownOutlined /></Button>
+            </Popover>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>Add New</Button>
+          </Space>
+        </Col>
+      </Row>
 
-      <Stack direction="row" spacing={2} mb={3} alignItems="center" flexWrap="wrap">
-        <TextField label="Search" variant="outlined" size="small" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} sx={{ flexGrow: 1, minWidth: '200px' }} />
-        <Button variant="outlined" startIcon={<FileDownloadIcon />}>Export</Button>
-        <Button variant="outlined" startIcon={<ViewColumnIcon />} onClick={(e) => setColumnAnchorEl(e.currentTarget)}>Columns</Button>
-        <Menu anchorEl={columnAnchorEl} open={Boolean(columnAnchorEl)} onClose={() => setColumnAnchorEl(null)}>
-          {Object.keys(visibleColumns).map((column) => (
-            <MenuItem key={column} onClick={() => handleColumnToggle(column as keyof typeof visibleColumns)}>
-               {column.replace(/_/g, ' ').toUpperCase()}
-            </MenuItem>
-          ))}
-        </Menu>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenDialog()}>Add New</Button>
-      </Stack>
+      <Card>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={12}><Input.Search placeholder="Search name/code..." onSearch={val => handleFilterChange('search', val)} allowClear /></Col>
+          <Col xs={24} sm={12}><RangePicker style={{ width: '100%' }} onChange={dates => handleFilterChange('updatedAt', dates)} /></Col>
+        </Row>
+      </Card>
 
-      {loading && <CircularProgress />}
-      {error && <Alert severity="error" sx={{ my: 2 }}>{error}</Alert>}
+      <Card bodyStyle={{ padding: 0 }}>
+        <Table dataSource={categories} columns={columns} loading={loading} rowKey="id" size="middle" scroll={{ x: 800 }}/>
+      </Card>
 
-      {!loading && !error && (
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                {visibleColumns.code && <TableCell>Code</TableCell>}
-                {visibleColumns.name && <TableCell>Name</TableCell>}
-                {visibleColumns.description && <TableCell>Description</TableCell>}
-                {visibleColumns.updated_at && <TableCell>Updated At</TableCell>}
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {categories.map((cat) => (
-                <TableRow key={cat.id} hover>
-                  {visibleColumns.code && <TableCell>{cat.code}</TableCell>}
-                  {visibleColumns.name && <TableCell>{cat.name}</TableCell>}
-                  {visibleColumns.description && <TableCell>{cat.description}</TableCell>}
-                  {visibleColumns.updated_at && <TableCell>{format(new Date(cat.updated_at || cat.created_at!), 'yyyy-MM-dd HH:mm')}</TableCell>}
-                  <TableCell>
-                    <IconButton onClick={() => handleOpenDialog(cat)} size="small"><EditIcon /></IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
-
-      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingCategory ? 'Edit UoM Category' : 'Add New UoM Category'}</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField label="Code" fullWidth value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: e.target.value })} required disabled={!!editingCategory} />
-            <TextField label="Name" fullWidth value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
-            <TextField label="Description" fullWidth multiline rows={3} value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ p: '16px 24px' }}>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSave} variant="contained">Save</Button>
-        </DialogActions>
-      </Dialog>
-    </Paper>
+      <Modal title={editingRecord ? 'Edit UoM Category' : 'Add New UoM Category'} open={isModalOpen} onOk={handleSave} onCancel={handleCancel} width={600} confirmLoading={loading} destroyOnClose>
+        <Form form={form} layout="vertical" name="uom_category_form" style={{ marginTop: 24 }}>
+          <Form.Item name="code" label="Code" rules={[{ required: true }]}><Input disabled={!!editingRecord} /></Form.Item>
+          <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item>
+          <Form.Item name="description" label="Description"><Input.TextArea rows={3} /></Form.Item>
+        </Form>
+      </Modal>
+    </Space>
   );
 };
+
+const UomCategoriesListPage: React.FC = () => (
+    <App><UomCategoriesListPageContent /></App>
+);
 
 export default UomCategoriesListPage;

@@ -69,7 +69,7 @@ const Sidebar: React.FC = () => {
             if (item.subItems) {
                 return (
                     <div key={item.name}>
-                        <button onClick={() => toggleMenu(item.path)} className={`w-full flex justify-between items-center text-left py-3 px-4 rounded-md transition-colors duration-200 ${isActive ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>
+                        <button onClick={() => toggleMenu(item.path)} className={`w-full flex justify-between items-center text-left py-3 px-4 rounded-md transition-colors duration-200 ${isActive ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>
                             <div className="flex items-center space-x-3">
                                 {item.icon}
                                 <span>{item.name}</span>
@@ -84,7 +84,7 @@ const Sidebar: React.FC = () => {
                                         <NavLink
                                             key={subItem.name}
                                             to={subItem.path}
-                                            className={`block py-2 px-3 rounded-md text-sm transition-colors duration-200 ${isSubActive ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`}>
+                                            className={`block py-2 px-3 rounded-md text-sm transition-colors duration-200 ${isSubActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`}>
                                             {subItem.name}
                                         </NavLink>
                                     )
@@ -99,7 +99,7 @@ const Sidebar: React.FC = () => {
                 <NavLink
                     key={item.name}
                     to={item.path}
-                    className={`flex items-center space-x-3 py-3 px-4 rounded-md transition-colors duration-200 ${isActive ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
+                    className={`flex items-center space-x-3 py-3 px-4 rounded-md transition-colors duration-200 ${isActive ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}
                 >
                     {item.icon}
                     <span>{item.name}</span>
@@ -109,8 +109,8 @@ const Sidebar: React.FC = () => {
     };
 
     return (
-        <aside className={`bg-gray-800 text-white transition-all duration-300 ease-in-out ${isOpen ? 'w-64' : 'w-0'} md:w-64 h-full flex flex-col`}>
-            <div className="flex items-center justify-center h-16 border-b border-gray-700">
+        <aside className={`bg-gray-800 text-white transition-all duration-300 ease-in-out ${isOpen ? 'w-64' : 'w-0'} h-full flex-col flex-shrink-0 flex`}>
+            <div className="flex items-center justify-center h-16 border-b border-gray-700 flex-shrink-0">
                 <h1 className="text-2xl font-bold text-white">XCloud</h1>
             </div>
             <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">

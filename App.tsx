@@ -1,7 +1,6 @@
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
-import { theme } from './styles/theme';
+import { ConfigProvider } from 'antd';
 
 import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
@@ -11,8 +10,8 @@ import GIPage from './pages/operations/GIPage';
 import ICPage from './pages/operations/ICPage';
 import GTPage from './pages/operations/GTPage';
 import PAPage from './pages/operations/PAPage';
-import GoodsTypesPage from './pages/goods/GoodsTypesPage';
-import GoodsModelsPage from './pages/goods/GoodsModelsPage';
+import GoodsTypesListPage from './pages/goods/GoodsTypesListPage';
+import GoodsModelsListPage from './pages/goods/GoodsModelsListPage';
 import OrganizationsListPage from './pages/master/OrganizationsListPage';
 import BranchesListPage from './pages/master/BranchesListPage';
 import WarehousesListPage from './pages/master/WarehousesListPage';
@@ -44,7 +43,32 @@ const App: React.FC = () => {
     const { session, signOut } = useAuthStore();
 
     return (
-        <ThemeProvider theme={theme}>
+        <ConfigProvider
+          theme={{
+            token: {
+              colorPrimary: '#2563eb', // Blue 600
+              borderRadius: 8,
+              fontFamily: "'Inter', sans-serif",
+            },
+            components: {
+              Button: {
+                  boxShadow: 'none',
+              },
+              Card: {
+                borderRadiusLG: 12,
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+              },
+              Table: {
+                headerBg: '#f8fafc',
+                headerColor: '#334155',
+                headerSortActiveBg: '#f1f5f9',
+              },
+              Modal: {
+                borderRadiusLG: 12,
+              }
+            }
+          }}
+        >
             <HashRouter>
                 <Routes>
                     <Route path="/login" element={session ? <Navigate to="/dashboard" /> : <LoginPage />} />
@@ -61,8 +85,8 @@ const App: React.FC = () => {
                                         <Route path="/operations/ic" element={<ICPage />} />
                                         <Route path="/operations/gt" element={<GTPage />} />
                                         <Route path="/operations/pa" element={<PAPage />} />
-                                        <Route path="/goods/types" element={<GoodsTypesPage />} />
-                                        <Route path="/goods/models" element={<GoodsModelsPage />} />
+                                        <Route path="/goods/types" element={<GoodsTypesListPage />} />
+                                        <Route path="/goods/models" element={<GoodsModelsListPage />} />
                                         <Route path="/master/organizations" element={<OrganizationsListPage />} />
                                         <Route path="/master/branches" element={<BranchesListPage />} />
                                         <Route path="/master/warehouses" element={<WarehousesListPage />} />
@@ -81,7 +105,7 @@ const App: React.FC = () => {
                     />
                 </Routes>
             </HashRouter>
-        </ThemeProvider>
+        </ConfigProvider>
     );
 };
 
