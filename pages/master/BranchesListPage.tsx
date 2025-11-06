@@ -261,6 +261,7 @@ const BranchesListPageContent: React.FC = () => {
         title={editingRecord ? 'Edit Branch' : 'Add New Branch'}
         open={isModalOpen}
         onOk={handleSave}
+        okText={editingRecord ? 'Save' : 'Create'}
         onCancel={handleCancel}
         width={600}
         confirmLoading={loading}
@@ -279,6 +280,9 @@ const BranchesListPageContent: React.FC = () => {
               <Input />
             </Form.Item>
             <Form.Item name="address" label="Address">
+              <Input.TextArea rows={3} />
+            </Form.Item>
+            <Form.Item name="description" label="Description">
               <Input.TextArea rows={3} />
             </Form.Item>
             {editingRecord && (

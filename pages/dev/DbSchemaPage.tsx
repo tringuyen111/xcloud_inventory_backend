@@ -42,7 +42,7 @@ interface PolicyDetail {
     table: string;
     name: string;
     command: string;
-    roles: string[];
+    roles: string[] | null;
     qualifier: string;
     with_check: string;
 }
@@ -135,7 +135,7 @@ const DbSchemaPage: React.FC = () => {
     {
       key: '4',
       label: `Policies (${schema?.policies?.length || 0})`,
-      children: <Table size="small" pagination={false} rowKey="name" dataSource={schema?.policies} columns={[ { title: 'Policy Name', dataIndex: 'name' }, { title: 'Table', dataIndex: 'table' }, { title: 'Command', dataIndex: 'command', render: (c: string) => <Tag>{c}</Tag> }, { title: 'Roles', dataIndex: 'roles', render: (r: string[]) => r.join(', ')} ]} />,
+      children: <Table size="small" pagination={false} rowKey="name" dataSource={schema?.policies} columns={[ { title: 'Policy Name', dataIndex: 'name' }, { title: 'Table', dataIndex: 'table' }, { title: 'Command', dataIndex: 'command', render: (c: string) => <Tag>{c}</Tag> }, { title: 'Roles', dataIndex: 'roles', render: (r: string[] | null) => r ? r.join(', ') : 'public' } ]} />,
     },
   ];
 

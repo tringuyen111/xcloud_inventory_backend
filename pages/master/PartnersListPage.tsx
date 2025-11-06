@@ -235,7 +235,16 @@ const PartnersListPageContent: React.FC = () => {
         <Table dataSource={partners} columns={columns} loading={loading} rowKey="id" size="middle" scroll={{ x: 1300 }} />
       </Card>
 
-      <Modal title={editingRecord ? 'Edit Partner' : 'Add New Partner'} open={isModalOpen} onOk={handleSave} onCancel={handleCancel} width={800} confirmLoading={loading} destroyOnClose>
+      <Modal 
+        title={editingRecord ? 'Edit Partner' : 'Add New Partner'} 
+        open={isModalOpen} 
+        onOk={handleSave} 
+        okText={editingRecord ? 'Save' : 'Create'}
+        onCancel={handleCancel} 
+        width={800} 
+        confirmLoading={loading} 
+        destroyOnClose
+      >
         <Form form={form} layout="vertical" name="partner_form" style={{ marginTop: 24 }}>
           <Row gutter={16}>
             <Col span={12}><Form.Item name="org_id" label="Organization" rules={[{ required: true }]}><Select>{organizations.map(org => <Select.Option key={org.id} value={org.id}>{org.name}</Select.Option>)}</Select></Form.Item></Col>
@@ -247,6 +256,7 @@ const PartnersListPageContent: React.FC = () => {
             <Col span={12}><Form.Item name="email" label="Email" rules={[{ type: 'email' }]}><Input /></Form.Item></Col>
             <Col span={12}>{editingRecord && <Form.Item name="is_active" label="Status"><Select><Select.Option value={true}>Active</Select.Option><Select.Option value={false}>Inactive</Select.Option></Select></Form.Item>}</Col>
             <Col span={24}><Form.Item name="address" label="Address"><Input.TextArea rows={3} /></Form.Item></Col>
+            <Col span={24}><Form.Item name="notes" label="Notes"><Input.TextArea rows={3} /></Form.Item></Col>
           </Row>
         </Form>
       </Modal>

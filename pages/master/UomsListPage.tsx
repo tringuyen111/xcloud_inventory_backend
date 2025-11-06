@@ -3,10 +3,10 @@ import { supabase } from '../../services/supabase';
 import { Uom, UomCategory } from '../../types/supabase';
 import {
   Button, Card, Input, Select, DatePicker, Table, Tag, Modal, Form,
-  Row, Col, Typography, Space, App, Popover, Checkbox, InputNumber, Switch
+  Row, Col, Typography, Space, App, Popover, Checkbox, InputNumber, Menu, Dropdown
 } from 'antd';
 import {
-  PlusOutlined, EditOutlined, ExportOutlined, DownOutlined
+  PlusOutlined, EditOutlined, ExportOutlined, DownOutlined, MoreOutlined, StopOutlined, CheckCircleOutlined
 } from '@ant-design/icons';
 import { format } from 'date-fns';
 import type { Dayjs } from 'dayjs';
@@ -24,6 +24,7 @@ const UomsListPageContent: React.FC = () => {
 
   const [filters, setFilters] = useState({
     search: '',
+    status: 'all',
     categoryId: 'all',
     isBase: 'all',
     updatedAt: null as [Dayjs, Dayjs] | null,
@@ -35,23 +36,25 @@ const UomsListPageContent: React.FC = () => {
     category: true,
     is_base: true,
     ratio_to_base: true,
+    status: true,
     updated_at: true,
   });
 
   const [form] = Form.useForm();
-  const { notification } = App.useApp();
+  const { notification, modal } = App.useApp();
   const isBaseUnit = Form.useWatch('is_base', form);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: catData, error: catError } = await supabase.from('uom_categories').select('id, name');
+      const { data: catData, error: catError } = await supabase.from('uom_categories').select('id, name').eq('is_active', true);
       if (catError) throw catError;
       setCategories(catData || []);
 
       let query = supabase.from('uoms').select('*, category:uom_categories(name)');
 
       if (filters.search) query = query.or(`name.ilike.%${filters.search}%,code.ilike.%${filters.search}%`);
+      if (filters.status !== 'all') query = query.eq('is_active', filters.status === 'active');
       if (filters.categoryId !== 'all') query = query.eq('category_id', filters.categoryId);
       if (filters.isBase !== 'all') query = query.eq('is_base', filters.isBase === 'yes');
       if (filters.updatedAt) {
@@ -75,7 +78,7 @@ const UomsListPageContent: React.FC = () => {
 
   const handleOpenModal = (record: UomWithCategory | null = null) => {
     setEditingRecord(record);
-    form.setFieldsValue(record ? { ...record } : { code: '', name: '', is_base: false, ratio_to_base: 1 });
+    form.setFieldsValue(record ? { ...record } : { code: '', name: '', is_active: true, is_base: false, ratio_to_base: 1 });
     setIsModalOpen(true);
   };
 
@@ -88,7 +91,6 @@ const UomsListPageContent: React.FC = () => {
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
-      // FIX: Removed destructuring of 'category' which does not exist in form values.
       const dataToSave = { ...values, updated_at: new Date().toISOString() };
       if (dataToSave.is_base) {
         dataToSave.ratio_to_base = 1;
@@ -110,6 +112,26 @@ const UomsListPageContent: React.FC = () => {
     }
   };
   
+   const handleToggleStatus = (record: Uom) => {
+    modal.confirm({
+      title: `Confirm ${record.is_active ? 'Deactivation' : 'Activation'}`,
+      content: `Are you sure you want to ${record.is_active ? 'deactivate' : 'activate'} the UoM "${record.name}"?`,
+      onOk: async () => {
+        try {
+          const { error } = await supabase
+            .from('uoms')
+            .update({ is_active: !record.is_active, updated_at: new Date().toISOString() })
+            .eq('id', record.id);
+          if (error) throw error;
+          notification.success({ message: `UoM status updated successfully` });
+          loadData();
+        } catch (err: any) {
+          notification.error({ message: 'Status update failed', description: err.message });
+        }
+      },
+    });
+  };
+
   const handleFilterChange = (key: string, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -118,17 +140,37 @@ const UomsListPageContent: React.FC = () => {
     { title: 'Code', dataIndex: 'code', key: 'code', hidden: !visibleColumns.code },
     { title: 'Name', dataIndex: 'name', key: 'name', hidden: !visibleColumns.name },
     { title: 'Category', dataIndex: ['category', 'name'], key: 'category', hidden: !visibleColumns.category },
-    { title: 'Is Base Unit', dataIndex: 'is_base', key: 'is_base', hidden: !visibleColumns.is_base, render: (isBase: boolean) => isBase && <Tag color="blue">Base</Tag> },
+    { title: 'Is Base Unit', dataIndex: 'is_base', key: 'is_base', hidden: !visibleColumns.is_base, render: (isBase: boolean) => isBase ? <Tag color="blue">Base</Tag> : null },
     { title: 'Ratio to Base', dataIndex: 'ratio_to_base', key: 'ratio_to_base', hidden: !visibleColumns.ratio_to_base },
+    { 
+      title: 'Status', dataIndex: 'is_active', key: 'status', hidden: !visibleColumns.status,
+      render: (isActive: boolean) => <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'Active' : 'Inactive'}</Tag>
+    },
     {
       title: 'Updated At', dataIndex: 'updated_at', key: 'updated_at', hidden: !visibleColumns.updated_at,
       render: (text: string, record: Uom) => format(new Date(text || record.created_at!), 'yyyy-MM-dd HH:mm')
     },
     {
       title: 'Actions', key: 'actions', fixed: 'right' as const, width: 100,
-      render: (_: any, record: UomWithCategory) => (
-        <Button icon={<EditOutlined />} onClick={() => handleOpenModal(record)} size="small">Edit</Button>
-      )
+      render: (_: any, record: UomWithCategory) => {
+        const menu = (
+          <Menu>
+            <Menu.Item key="1" icon={<EditOutlined />} onClick={() => handleOpenModal(record)}>Edit</Menu.Item>
+            <Menu.Item
+              key="2"
+              icon={record.is_active ? <StopOutlined /> : <CheckCircleOutlined />}
+              onClick={() => handleToggleStatus(record)}
+            >
+              {record.is_active ? 'Deactivate' : 'Activate'}
+            </Menu.Item>
+          </Menu>
+        );
+        return (
+          <Dropdown overlay={menu} trigger={['click']}>
+            <Button icon={<MoreOutlined />} size="small" />
+          </Dropdown>
+        );
+      }
     },
   ].filter(col => !col.hidden);
   
@@ -166,17 +208,22 @@ const UomsListPageContent: React.FC = () => {
 
       <Card>
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={6}><Input.Search placeholder="Search name/code..." onSearch={val => handleFilterChange('search', val)} allowClear /></Col>
-          <Col xs={24} sm={12} md={6}><Select style={{ width: '100%' }} placeholder="Filter by Category" onChange={val => handleFilterChange('categoryId', val)} allowClear>
+          <Col xs={24} sm={12} md={5}><Input.Search placeholder="Search name/code..." onSearch={val => handleFilterChange('search', val)} allowClear /></Col>
+          <Col xs={24} sm={12} md={5}><Select style={{ width: '100%' }} placeholder="Filter by Category" onChange={val => handleFilterChange('categoryId', val)} allowClear>
             <Select.Option value="all">All Categories</Select.Option>
             {categories.map(c => <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>)}
           </Select></Col>
-          <Col xs={24} sm={12} md={6}><Select defaultValue="all" style={{ width: '100%' }} onChange={val => handleFilterChange('isBase', val)}>
+          <Col xs={24} sm={12} md={5}><Select defaultValue="all" style={{ width: '100%' }} onChange={val => handleFilterChange('isBase', val)}>
             <Select.Option value="all">All Units</Select.Option>
             <Select.Option value="yes">Base Unit</Select.Option>
             <Select.Option value="no">Not Base Unit</Select.Option>
           </Select></Col>
-          <Col xs={24} sm={12} md={6}><RangePicker style={{ width: '100%' }} onChange={dates => handleFilterChange('updatedAt', dates)} /></Col>
+          <Col xs={24} sm={12} md={5}><Select defaultValue="all" style={{ width: '100%' }} onChange={val => handleFilterChange('status', val)}>
+            <Select.Option value="all">All Status</Select.Option>
+            <Select.Option value="active">Active</Select.Option>
+            <Select.Option value="inactive">Inactive</Select.Option>
+          </Select></Col>
+          <Col xs={24} sm={12} md={4}><RangePicker style={{ width: '100%' }} onChange={dates => handleFilterChange('updatedAt', dates)} /></Col>
         </Row>
       </Card>
 
@@ -184,14 +231,33 @@ const UomsListPageContent: React.FC = () => {
         <Table dataSource={uoms} columns={columns} loading={loading} rowKey="id" size="middle" scroll={{ x: 1000 }} />
       </Card>
 
-      <Modal title={editingRecord ? 'Edit UoM' : 'Add New UoM'} open={isModalOpen} onOk={handleSave} onCancel={handleCancel} width={700} confirmLoading={loading} destroyOnClose>
-        <Form form={form} layout="vertical" name="uom_form" style={{ marginTop: 24 }} initialValues={{ ratio_to_base: 1, is_base: false }}>
+      <Modal 
+        title={editingRecord ? 'Edit UoM' : 'Add New UoM'} 
+        open={isModalOpen} 
+        onOk={handleSave} 
+        okText={editingRecord ? 'Save' : 'Create'}
+        onCancel={handleCancel} 
+        width={700} 
+        confirmLoading={loading} 
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical" name="uom_form" style={{ marginTop: 24 }} initialValues={{ ratio_to_base: 1, is_base: false, is_active: true }}>
           <Row gutter={16}>
             <Col span={12}><Form.Item name="category_id" label="Category" rules={[{ required: true }]}><Select>{categories.map(c => <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>)}</Select></Form.Item></Col>
             <Col span={12}><Form.Item name="code" label="Code" rules={[{ required: true }]}><Input disabled={!!editingRecord} /></Form.Item></Col>
             <Col span={12}><Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item></Col>
-            <Col span={12}><Form.Item name="is_base" label="Is Base Unit" valuePropName="checked"><Switch /></Form.Item></Col>
+            <Col span={12}><Form.Item name="is_base" label="Is Base Unit" rules={[{ required: true }]}><Select><Select.Option value={true}>Yes</Select.Option><Select.Option value={false}>No</Select.Option></Select></Form.Item></Col>
             <Col span={12}><Form.Item name="ratio_to_base" label="Ratio to Base"><InputNumber style={{ width: '100%' }} min={0} disabled={isBaseUnit} /></Form.Item></Col>
+             {editingRecord && (
+              <Col span={12}>
+                <Form.Item name="is_active" label="Status" rules={[{ required: true }]}>
+                  <Select>
+                    <Select.Option value={true}>Active</Select.Option>
+                    <Select.Option value={false}>Inactive</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+            )}
           </Row>
         </Form>
       </Modal>

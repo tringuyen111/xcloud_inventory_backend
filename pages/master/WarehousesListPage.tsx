@@ -232,12 +232,22 @@ const WarehousesListPageContent: React.FC = () => {
         <Table dataSource={warehouses} columns={columns} loading={loading} rowKey="id" size="middle" scroll={{ x: 1000 }} />
       </Card>
 
-      <Modal title={editingRecord ? 'Edit Warehouse' : 'Add New Warehouse'} open={isModalOpen} onOk={handleSave} onCancel={handleCancel} width={600} confirmLoading={loading} destroyOnClose>
+      <Modal 
+        title={editingRecord ? 'Edit Warehouse' : 'Add New Warehouse'} 
+        open={isModalOpen} 
+        onOk={handleSave} 
+        okText={editingRecord ? 'Save' : 'Create'}
+        onCancel={handleCancel} 
+        width={600} 
+        confirmLoading={loading} 
+        destroyOnClose
+      >
         <Form form={form} layout="vertical" name="warehouse_form" style={{ marginTop: 24 }}>
           <Form.Item name="branch_id" label="Branch" rules={[{ required: true }]}><Select>{branches.map(b => <Select.Option key={b.id} value={b.id}>{b.name}</Select.Option>)}</Select></Form.Item>
           <Form.Item name="code" label="Code" rules={[{ required: true }]}><Input disabled={!!editingRecord} /></Form.Item>
           <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="warehouse_type" label="Warehouse Type" initialValue="NORMAL"><Select>{WAREHOUSE_TYPES.map(type => <Select.Option key={type} value={type}>{type}</Select.Option>)}</Select></Form.Item>
+          <Form.Item name="description" label="Description"><Input.TextArea rows={3} /></Form.Item>
           {editingRecord && (
             <Form.Item name="is_active" label="Status" rules={[{ required: true }]}><Select><Select.Option value={true}>Active</Select.Option><Select.Option value={false}>Inactive</Select.Option></Select></Form.Item>
           )}

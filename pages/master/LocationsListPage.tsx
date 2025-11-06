@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
-import { Location, Warehouse } from '../../types/supabase';
+import { Location, Warehouse, GoodsModel } from '../../types/supabase';
 import {
   Button, Card, Input, Select, DatePicker, Table, Tag, Modal, Form,
   Row, Col, Typography, Space, App, Popover, Checkbox, Dropdown, Menu
@@ -13,14 +13,15 @@ import type { Dayjs } from 'dayjs';
 
 const { RangePicker } = DatePicker;
 
-type LocationWithWarehouse = Location & { warehouse?: { name: string } };
+type LocationWithDetails = Location & { warehouse?: { name: string } };
 
 const LocationsListPageContent: React.FC = () => {
-  const [locations, setLocations] = useState<LocationWithWarehouse[]>([]);
+  const [locations, setLocations] = useState<LocationWithDetails[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [goodsModels, setGoodsModels] = useState<(GoodsModel & { code: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<LocationWithWarehouse | null>(null);
+  const [editingRecord, setEditingRecord] = useState<LocationWithDetails | null>(null);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -31,30 +32,35 @@ const LocationsListPageContent: React.FC = () => {
 
   const [visibleColumns, setVisibleColumns] = useState({
     code: true,
+    name: true,
     warehouse: true,
-    aisle: true,
-    rack: true,
-    shelf: true,
-    bin: true,
+    constraint_type: true,
     status: true,
     updated_at: true,
   });
 
   const [form] = Form.useForm();
   const { notification, modal } = App.useApp();
+  const constraintType = Form.useWatch('constraint_type', form);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: whData, error: whError } = await supabase.from('warehouses').select('id, name').eq('is_active', true);
+      const whPromise = supabase.from('warehouses').select('id, name').eq('is_active', true);
+      const gmPromise = supabase.from('goods_models').select('id, name, code').eq('is_active', true);
+      
+      const [{data: whData, error: whError}, {data: gmData, error: gmError}] = await Promise.all([whPromise, gmPromise]);
+
       if (whError) throw whError;
+      if (gmError) throw gmError;
+
       setWarehouses(whData || []);
+      setGoodsModels(gmData || []);
 
       let query = supabase.from('locations').select('*, warehouse:warehouses(name)');
 
       if (filters.search) {
-          const searchPattern = `%${filters.search}%`;
-          query = query.or(`code.ilike.${searchPattern},aisle.ilike.${searchPattern},rack.ilike.${searchPattern},shelf.ilike.${searchPattern},bin.ilike.${searchPattern}`);
+          query = query.or(`code.ilike.%${filters.search}%,name.ilike.%${filters.search}%`);
       }
       if (filters.status !== 'all') query = query.eq('is_active', filters.status === 'active');
       if (filters.warehouseId !== 'all') query = query.eq('warehouse_id', filters.warehouseId);
@@ -77,9 +83,9 @@ const LocationsListPageContent: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  const handleOpenModal = (record: LocationWithWarehouse | null = null) => {
+  const handleOpenModal = (record: LocationWithDetails | null = null) => {
     setEditingRecord(record);
-    form.setFieldsValue(record ? { ...record } : { code: '', is_active: true });
+    form.setFieldsValue(record ? { ...record, constrained_goods_model_ids: record.constrained_goods_model_ids || [] } : { code: '', name: '', description: '', is_active: true, constraint_type: 'NONE', constrained_goods_model_ids: [] });
     setIsModalOpen(true);
   };
   
@@ -91,7 +97,10 @@ const LocationsListPageContent: React.FC = () => {
 
   const handleSave = async () => {
     try {
-      const values = await form.validateFields();
+      let values = await form.validateFields();
+      if (values.constraint_type === 'NONE') {
+        values = { ...values, constrained_goods_model_ids: null };
+      }
       const dataToSave = { ...values, updated_at: new Date().toISOString() };
 
       if (editingRecord) {
@@ -113,7 +122,7 @@ const LocationsListPageContent: React.FC = () => {
   const handleToggleStatus = (record: Location) => {
     modal.confirm({
       title: `Confirm ${record.is_active ? 'Deactivation' : 'Activation'}`,
-      content: `Are you sure you want to ${record.is_active ? 'deactivate' : 'activate'} the location "${record.code}"?`,
+      content: `Are you sure you want to ${record.is_active ? 'deactivate' : 'activate'} the location "${record.name}"?`,
       onOk: async () => {
         try {
           const { error } = await supabase
@@ -134,13 +143,28 @@ const LocationsListPageContent: React.FC = () => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
+  const tagRender = (props: any) => {
+    const { label, closable, onClose } = props;
+    return (
+      <Tag
+        color="blue"
+        closable={closable}
+        onClose={onClose}
+        style={{ marginRight: 3 }}
+      >
+        {label}
+      </Tag>
+    );
+  };
+
   const columns = [
     { title: 'Code', dataIndex: 'code', key: 'code', hidden: !visibleColumns.code },
+    { title: 'Name', dataIndex: 'name', key: 'name', hidden: !visibleColumns.name },
     { title: 'Warehouse', dataIndex: ['warehouse', 'name'], key: 'warehouse', hidden: !visibleColumns.warehouse },
-    { title: 'Aisle', dataIndex: 'aisle', key: 'aisle', hidden: !visibleColumns.aisle },
-    { title: 'Rack', dataIndex: 'rack', key: 'rack', hidden: !visibleColumns.rack },
-    { title: 'Shelf', dataIndex: 'shelf', key: 'shelf', hidden: !visibleColumns.shelf },
-    { title: 'Bin', dataIndex: 'bin', key: 'bin', hidden: !visibleColumns.bin },
+    { 
+      title: 'Constraint', dataIndex: 'constraint_type', key: 'constraint_type', hidden: !visibleColumns.constraint_type,
+      render: (type: string) => <Tag>{type.replace('_', ' ')}</Tag>
+    },
     {
       title: 'Status', dataIndex: 'is_active', key: 'status', hidden: !visibleColumns.status,
       render: (isActive: boolean) => <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'Active' : 'Inactive'}</Tag>
@@ -151,7 +175,7 @@ const LocationsListPageContent: React.FC = () => {
     },
     {
       title: 'Actions', key: 'actions', fixed: 'right' as const, width: 100,
-      render: (_: any, record: LocationWithWarehouse) => {
+      render: (_: any, record: LocationWithDetails) => {
         const menu = (
           <Menu>
             <Menu.Item key="1" icon={<EditOutlined />} onClick={() => handleOpenModal(record)}>
@@ -210,7 +234,7 @@ const LocationsListPageContent: React.FC = () => {
 
       <Card>
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={6}><Input.Search placeholder="Search code, aisle, rack..." onSearch={val => handleFilterChange('search', val)} allowClear /></Col>
+          <Col xs={24} sm={12} md={6}><Input.Search placeholder="Search by code/name..." onSearch={val => handleFilterChange('search', val)} allowClear /></Col>
           <Col xs={24} sm={12} md={6}><Select style={{ width: '100%' }} placeholder="Filter by Warehouse" onChange={val => handleFilterChange('warehouseId', val)} allowClear>
             <Select.Option value="all">All Warehouses</Select.Option>
             {warehouses.map(w => <Select.Option key={w.id} value={w.id}>{w.name}</Select.Option>)}
@@ -225,18 +249,51 @@ const LocationsListPageContent: React.FC = () => {
       </Card>
 
       <Card bodyStyle={{ padding: 0 }}>
-        <Table dataSource={locations} columns={columns} loading={loading} rowKey="id" size="middle" scroll={{ x: 1200 }} />
+        <Table dataSource={locations} columns={columns} loading={loading} rowKey="id" size="middle" scroll={{ x: 1000 }} />
       </Card>
 
-      <Modal title={editingRecord ? 'Edit Location' : 'Add New Location'} open={isModalOpen} onOk={handleSave} onCancel={handleCancel} width={800} confirmLoading={loading} destroyOnClose>
+      <Modal 
+        title={editingRecord ? 'Edit Location' : 'Add New Location'} 
+        open={isModalOpen} 
+        onOk={handleSave} 
+        okText={editingRecord ? 'Save' : 'Create'}
+        onCancel={handleCancel} 
+        width={800} 
+        confirmLoading={loading} 
+        destroyOnClose
+      >
         <Form form={form} layout="vertical" name="location_form" style={{ marginTop: 24 }}>
           <Row gutter={16}>
             <Col span={12}><Form.Item name="warehouse_id" label="Warehouse" rules={[{ required: true }]}><Select>{warehouses.map(w => <Select.Option key={w.id} value={w.id}>{w.name}</Select.Option>)}</Select></Form.Item></Col>
-            <Col span={12}><Form.Item name="code" label="Location Code" rules={[{ required: true }]}><Input disabled={!!editingRecord} /></Form.Item></Col>
-            <Col span={6}><Form.Item name="aisle" label="Aisle"><Input /></Form.Item></Col>
-            <Col span={6}><Form.Item name="rack" label="Rack"><Input /></Form.Item></Col>
-            <Col span={6}><Form.Item name="shelf" label="Shelf"><Input /></Form.Item></Col>
-            <Col span={6}><Form.Item name="bin" label="Bin"><Input /></Form.Item></Col>
+            <Col span={12}><Form.Item name="code" label="Location Code" rules={[{ required: true }]}><Input/></Form.Item></Col>
+            <Col span={24}><Form.Item name="name" label="Location Name" rules={[{ required: true }]}><Input/></Form.Item></Col>
+            <Col span={24}><Form.Item name="description" label="Description"><Input.TextArea rows={2}/></Form.Item></Col>
+            
+            <Col span={24}><Typography.Title level={5}>Goods Model Constraints</Typography.Title></Col>
+            <Col span={12}>
+              <Form.Item name="constraint_type" label="Constraint Type" rules={[{ required: true }]}>
+                <Select>
+                  <Select.Option value="NONE">None (Accepts all models)</Select.Option>
+                  <Select.Option value="ALLOWED">Allowed List (Only accepts selected models)</Select.Option>
+                  <Select.Option value="DISALLOWED">Disallowed List (Accepts all except selected)</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            {constraintType && constraintType !== 'NONE' && (
+              <Col span={24}>
+                <Form.Item name="constrained_goods_model_ids" label="Constrained Goods Models">
+                  <Select
+                    mode="multiple"
+                    allowClear
+                    style={{ width: '100%' }}
+                    placeholder="Please select goods models"
+                    options={goodsModels.map(model => ({ label: `${model.name} (${model.code})`, value: model.id }))}
+                    tagRender={tagRender}
+                  />
+                </Form.Item>
+              </Col>
+            )}
+
             <Col span={24}>{editingRecord && <Form.Item name="is_active" label="Status"><Select><Select.Option value={true}>Active</Select.Option><Select.Option value={false}>Inactive</Select.Option></Select></Form.Item>}</Col>
           </Row>
         </Form>

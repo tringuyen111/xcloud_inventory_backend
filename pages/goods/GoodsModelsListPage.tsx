@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
-import { GoodsModel, GoodsType } from '../../types/supabase';
+import { GoodsModel, GoodsType, Uom } from '../../types/supabase';
 import {
   Button, Card, Input, Select, DatePicker, Table, Tag, Modal, Form,
   Row, Col, Typography, Space, App, Popover, Checkbox, Dropdown, Menu
@@ -13,19 +13,26 @@ import type { Dayjs } from 'dayjs';
 
 const { RangePicker } = DatePicker;
 
-type GoodsModelWithGoodsType = GoodsModel & { goods_type?: { name: string } };
+type GoodsModelWithDetails = GoodsModel & { 
+  goods_type?: { name: string },
+  base_uom?: { name: string },
+};
+
+const TRACKING_TYPES: GoodsModel['tracking_type'][] = ['NONE', 'LOT', 'SERIAL'];
 
 const GoodsModelsListPageContent: React.FC = () => {
-  const [goodsModels, setGoodsModels] = useState<GoodsModelWithGoodsType[]>([]);
+  const [goodsModels, setGoodsModels] = useState<GoodsModelWithDetails[]>([]);
   const [goodsTypes, setGoodsTypes] = useState<GoodsType[]>([]);
+  const [uoms, setUoms] = useState<Uom[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<GoodsModelWithGoodsType | null>(null);
+  const [editingRecord, setEditingRecord] = useState<GoodsModelWithDetails | null>(null);
   
   const [filters, setFilters] = useState({
     search: '',
     status: 'all',
     goodsTypeId: 'all',
+    trackingType: 'all',
     updatedAt: null as [Dayjs, Dayjs] | null,
   });
 
@@ -33,6 +40,8 @@ const GoodsModelsListPageContent: React.FC = () => {
     code: true,
     name: true,
     goods_type: true,
+    tracking_type: true,
+    base_uom: true,
     status: true,
     updated_at: true,
   });
@@ -43,11 +52,18 @@ const GoodsModelsListPageContent: React.FC = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: typeData, error: typeError } = await supabase.from('goods_types').select('id, name').eq('is_active', true);
-      if (typeError) throw typeError;
-      setGoodsTypes(typeData || []);
+      const typesPromise = supabase.from('goods_types').select('id, name').eq('is_active', true);
+      const uomsPromise = supabase.from('uoms').select('id, name').eq('is_active', true);
+      
+      const [{data: typesData, error: typesError}, {data: uomsData, error: uomsError}] = await Promise.all([typesPromise, uomsPromise]);
 
-      let query = supabase.from('goods_models').select('*, goods_type:goods_types(name)');
+      if (typesError) throw typesError;
+      if (uomsError) throw uomsError;
+      
+      setGoodsTypes(typesData || []);
+      setUoms(uomsData || []);
+
+      let query = supabase.from('goods_models').select('*, goods_type:goods_types(name), base_uom:uoms(name)');
 
       if (filters.search) {
         query = query.or(`name.ilike.%${filters.search}%,code.ilike.%${filters.search}%`);
@@ -57,6 +73,9 @@ const GoodsModelsListPageContent: React.FC = () => {
       }
       if (filters.goodsTypeId !== 'all') {
         query = query.eq('goods_type_id', filters.goodsTypeId);
+      }
+      if (filters.trackingType !== 'all') {
+        query = query.eq('tracking_type', filters.trackingType);
       }
       if (filters.updatedAt) {
         query = query.gte('updated_at', filters.updatedAt[0].startOf('day').toISOString());
@@ -78,10 +97,9 @@ const GoodsModelsListPageContent: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  const handleOpenModal = (record: GoodsModelWithGoodsType | null = null) => {
+  const handleOpenModal = (record: GoodsModelWithDetails | null = null) => {
     setEditingRecord(record);
-    const specifications = record?.specifications ? JSON.stringify(record.specifications, null, 2) : '';
-    form.setFieldsValue(record ? { ...record, specifications } : { code: '', name: '', is_active: true, specifications: '' });
+    form.setFieldsValue(record ? { ...record } : { code: '', name: '', description: '', is_active: true, tracking_type: 'NONE' });
     setIsModalOpen(true);
   };
 
@@ -94,19 +112,8 @@ const GoodsModelsListPageContent: React.FC = () => {
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
-      let specs = null;
-      if (values.specifications) {
-        try {
-          specs = JSON.parse(values.specifications);
-        } catch (e) {
-          notification.error({ message: 'Invalid JSON', description: 'Specifications field must be valid JSON.'});
-          return;
-        }
-      }
-
       const dataToSave = {
         ...values,
-        specifications: specs,
         updated_at: new Date().toISOString(),
       };
 
@@ -121,11 +128,12 @@ const GoodsModelsListPageContent: React.FC = () => {
       }
       handleCancel();
       loadData();
-    } catch (err: any) {
+    } catch (err: any)
+{
       notification.error({ message: 'Save failed', description: err.message });
     }
   };
-  
+
   const handleToggleStatus = (record: GoodsModel) => {
     modal.confirm({
       title: `Confirm ${record.is_active ? 'Deactivation' : 'Activation'}`,
@@ -155,6 +163,16 @@ const GoodsModelsListPageContent: React.FC = () => {
     { title: 'Name', dataIndex: 'name', key: 'name', hidden: !visibleColumns.name },
     { title: 'Goods Type', dataIndex: ['goods_type', 'name'], key: 'goods_type', hidden: !visibleColumns.goods_type },
     { 
+      title: 'Tracking Type', dataIndex: 'tracking_type', key: 'tracking_type', hidden: !visibleColumns.tracking_type,
+      render: (type: GoodsModel['tracking_type']) => {
+        let color = 'default';
+        if (type === 'LOT') color = 'gold';
+        if (type === 'SERIAL') color = 'cyan';
+        return <Tag color={color}>{type}</Tag>;
+      }
+    },
+    { title: 'Base UoM', dataIndex: ['base_uom', 'name'], key: 'base_uom', hidden: !visibleColumns.base_uom },
+    { 
       title: 'Status', dataIndex: 'is_active', key: 'status', hidden: !visibleColumns.status,
       render: (isActive: boolean) => (
         <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'Active' : 'Inactive'}</Tag>
@@ -166,7 +184,7 @@ const GoodsModelsListPageContent: React.FC = () => {
     },
     {
       title: 'Actions', key: 'actions', fixed: 'right' as const, width: 100,
-      render: (_: any, record: GoodsModelWithGoodsType) => {
+      render: (_: any, record: GoodsModelWithDetails) => {
         const menu = (
           <Menu>
             <Menu.Item key="1" icon={<EditOutlined />} onClick={() => handleOpenModal(record)}>
@@ -210,7 +228,7 @@ const GoodsModelsListPageContent: React.FC = () => {
       <Row justify="space-between" align="middle">
           <Col>
               <Typography.Title level={3} style={{ margin: 0 }}>Goods Models</Typography.Title>
-              <Typography.Text type="secondary">Manage specific models of goods</Typography.Text>
+              <Typography.Text type="secondary">Manage models (SKUs) of goods</Typography.Text>
           </Col>
           <Col>
               <Space>
@@ -226,22 +244,37 @@ const GoodsModelsListPageContent: React.FC = () => {
       </Row>
 
       <Card>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={6}>
-            <Input.Search placeholder="Search by name or code..." onSearch={value => handleFilterChange('search', value)} allowClear />
+        <Row gutter={[16, 16]} align="bottom">
+          <Col xs={24} sm={12} lg={5}>
+              <Typography.Text>Search</Typography.Text>
+              <Input.Search placeholder="Search by name or code..." onSearch={value => handleFilterChange('search', value)} allowClear />
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} lg={5}>
+              <Typography.Text>Goods Type</Typography.Text>
+              <Select
+                style={{ width: '100%' }}
+                placeholder="Filter by Goods Type"
+                onChange={value => handleFilterChange('goodsTypeId', value)}
+                defaultValue="all"
+              >
+                <Select.Option value="all">All Goods Types</Select.Option>
+                {goodsTypes.map(type => <Select.Option key={type.id} value={type.id}>{type.name}</Select.Option>)}
+              </Select>
+          </Col>
+          <Col xs={24} sm={12} lg={5}>
+            <Typography.Text>Tracking Type</Typography.Text>
             <Select
               style={{ width: '100%' }}
-              placeholder="Filter by Goods Type"
-              onChange={value => handleFilterChange('goodsTypeId', value)}
-              allowClear
+              placeholder="Filter by Tracking Type"
+              onChange={value => handleFilterChange('trackingType', value)}
+              defaultValue="all"
             >
-              <Select.Option value="all">All Goods Types</Select.Option>
-              {goodsTypes.map(type => <Select.Option key={type.id} value={type.id}>{type.name}</Select.Option>)}
+              <Select.Option value="all">All Tracking Types</Select.Option>
+              {TRACKING_TYPES.map(type => <Select.Option key={type} value={type}>{type}</Select.Option>)}
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} lg={4}>
+            <Typography.Text>Status</Typography.Text>
             <Select
               defaultValue="all"
               style={{ width: '100%' }}
@@ -252,7 +285,8 @@ const GoodsModelsListPageContent: React.FC = () => {
               <Select.Option value="inactive">Inactive</Select.Option>
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={24} lg={5}>
+             <Typography.Text>Updated At</Typography.Text>
              <RangePicker style={{ width: '100%' }} onChange={dates => handleFilterChange('updatedAt', dates)} />
           </Col>
         </Row>
@@ -273,6 +307,7 @@ const GoodsModelsListPageContent: React.FC = () => {
         title={editingRecord ? 'Edit Goods Model' : 'Add New Goods Model'}
         open={isModalOpen}
         onOk={handleSave}
+        okText={editingRecord ? 'Save' : 'Create'}
         onCancel={handleCancel}
         width={800}
         confirmLoading={loading}
@@ -280,31 +315,40 @@ const GoodsModelsListPageContent: React.FC = () => {
       >
         <Form form={form} layout="vertical" name="goods_model_form" style={{ marginTop: 24 }}>
           <Row gutter={16}>
+             <Col span={12}>
+              <Form.Item name="code" label="Code" rules={[{ required: true, message: 'Code is required' }]}>
+                <Input disabled={!!editingRecord} />
+              </Form.Item>
+            </Col>
             <Col span={12}>
-              <Form.Item name="goods_type_id" label="Goods Type" rules={[{ required: true }]}>
-                <Select>
+              <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Name is required' }]}>
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="goods_type_id" label="Goods Type" rules={[{ required: true, message: 'Goods Type is required' }]}>
+                <Select placeholder="Select a goods type">
                   {goodsTypes.map(type => <Select.Option key={type.id} value={type.id}>{type.name}</Select.Option>)}
                 </Select>
               </Form.Item>
             </Col>
-            <Col span={12}>
-                <Form.Item name="code" label="Code" rules={[{ required: true }]}>
-                <Input disabled={!!editingRecord} />
-                </Form.Item>
+             <Col span={12}>
+              <Form.Item name="base_uom_id" label="Base UoM" rules={[{ required: true, message: 'Base UoM is required' }]}>
+                <Select placeholder="Select a base unit of measure">
+                  {uoms.map(uom => <Select.Option key={uom.id} value={uom.id}>{uom.name}</Select.Option>)}
+                </Select>
+              </Form.Item>
             </Col>
-            <Col span={24}>
-                <Form.Item name="name" label="Name" rules={[{ required: true }]}>
-                <Input />
-                </Form.Item>
+            <Col span={12}>
+              <Form.Item name="tracking_type" label="Tracking Type" rules={[{ required: true, message: 'Tracking Type is required' }]}>
+                <Select placeholder="Select a tracking type">
+                  {TRACKING_TYPES.map(type => <Select.Option key={type} value={type}>{type}</Select.Option>)}
+                </Select>
+              </Form.Item>
             </Col>
             <Col span={24}>
               <Form.Item name="description" label="Description">
                 <Input.TextArea rows={3} />
-              </Form.Item>
-            </Col>
-            <Col span={24}>
-              <Form.Item name="specifications" label="Specifications (JSON format)">
-                <Input.TextArea rows={5} placeholder='{&#10;  "weight": "10kg",&#10;  "dimensions": "10x20x30 cm"&#10;}' />
               </Form.Item>
             </Col>
             {editingRecord && (

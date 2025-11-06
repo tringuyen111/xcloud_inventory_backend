@@ -242,6 +242,7 @@ const GoodsTypesListPageContent: React.FC = () => {
         title={editingRecord ? 'Edit Goods Type' : 'Add New Goods Type'}
         open={isModalOpen}
         onOk={handleSave}
+        okText={editingRecord ? 'Save' : 'Create'}
         onCancel={handleCancel}
         width={600}
         confirmLoading={loading}

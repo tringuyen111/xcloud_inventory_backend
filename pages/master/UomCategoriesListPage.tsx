@@ -3,10 +3,10 @@ import { supabase } from '../../services/supabase';
 import { UomCategory } from '../../types/supabase';
 import {
   Button, Card, Input, DatePicker, Table, Modal, Form,
-  Row, Col, Typography, Space, App, Popover, Checkbox
+  Row, Col, Typography, Space, App, Popover, Checkbox, Select, Menu, Dropdown, Tag
 } from 'antd';
 import {
-  PlusOutlined, EditOutlined, ExportOutlined, DownOutlined
+  PlusOutlined, EditOutlined, ExportOutlined, DownOutlined, MoreOutlined, StopOutlined, CheckCircleOutlined
 } from '@ant-design/icons';
 import { format } from 'date-fns';
 import type { Dayjs } from 'dayjs';
@@ -21,6 +21,7 @@ const UomCategoriesListPageContent: React.FC = () => {
 
   const [filters, setFilters] = useState({
     search: '',
+    status: 'all',
     updatedAt: null as [Dayjs, Dayjs] | null,
   });
 
@@ -28,17 +29,21 @@ const UomCategoriesListPageContent: React.FC = () => {
     code: true,
     name: true,
     description: true,
+    status: true,
     updated_at: true,
   });
 
   const [form] = Form.useForm();
-  const { notification } = App.useApp();
+  const { notification, modal } = App.useApp();
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       let query = supabase.from('uom_categories').select('*');
       if (filters.search) query = query.or(`name.ilike.%${filters.search}%,code.ilike.%${filters.search}%`);
+      if (filters.status !== 'all') {
+        query = query.eq('is_active', filters.status === 'active');
+      }
       if (filters.updatedAt) {
         query = query.gte('updated_at', filters.updatedAt[0].startOf('day').toISOString());
         query = query.lte('updated_at', filters.updatedAt[1].endOf('day').toISOString());
@@ -59,7 +64,7 @@ const UomCategoriesListPageContent: React.FC = () => {
 
   const handleOpenModal = (record: UomCategory | null = null) => {
     setEditingRecord(record);
-    form.setFieldsValue(record ? { ...record } : { code: '', name: '' });
+    form.setFieldsValue(record ? { ...record } : { code: '', name: '', is_active: true });
     setIsModalOpen(true);
   };
   
@@ -89,6 +94,26 @@ const UomCategoriesListPageContent: React.FC = () => {
     }
   };
 
+  const handleToggleStatus = (record: UomCategory) => {
+    modal.confirm({
+      title: `Confirm ${record.is_active ? 'Deactivation' : 'Activation'}`,
+      content: `Are you sure you want to ${record.is_active ? 'deactivate' : 'activate'} "${record.name}"?`,
+      onOk: async () => {
+        try {
+          const { error } = await supabase
+            .from('uom_categories')
+            .update({ is_active: !record.is_active, updated_at: new Date().toISOString() })
+            .eq('id', record.id);
+          if (error) throw error;
+          notification.success({ message: `Status updated successfully` });
+          loadData();
+        } catch (err: any) {
+          notification.error({ message: 'Status update failed', description: err.message });
+        }
+      },
+    });
+  };
+
   const handleFilterChange = (key: string, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -97,15 +122,37 @@ const UomCategoriesListPageContent: React.FC = () => {
     { title: 'Code', dataIndex: 'code', key: 'code', hidden: !visibleColumns.code },
     { title: 'Name', dataIndex: 'name', key: 'name', hidden: !visibleColumns.name },
     { title: 'Description', dataIndex: 'description', key: 'description', hidden: !visibleColumns.description },
+    { 
+      title: 'Status', dataIndex: 'is_active', key: 'status', hidden: !visibleColumns.status,
+      render: (isActive: boolean) => <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'Active' : 'Inactive'}</Tag>
+    },
     {
       title: 'Updated At', dataIndex: 'updated_at', key: 'updated_at', hidden: !visibleColumns.updated_at,
       render: (text: string, record: UomCategory) => format(new Date(text || record.created_at!), 'yyyy-MM-dd HH:mm')
     },
     {
       title: 'Actions', key: 'actions', fixed: 'right' as const, width: 100,
-      render: (_: any, record: UomCategory) => (
-        <Button icon={<EditOutlined />} onClick={() => handleOpenModal(record)} size="small">Edit</Button>
-      )
+      render: (_: any, record: UomCategory) => {
+        const menu = (
+          <Menu>
+            <Menu.Item key="1" icon={<EditOutlined />} onClick={() => handleOpenModal(record)}>
+              Edit
+            </Menu.Item>
+            <Menu.Item
+              key="2"
+              icon={record.is_active ? <StopOutlined /> : <CheckCircleOutlined />}
+              onClick={() => handleToggleStatus(record)}
+            >
+              {record.is_active ? 'Deactivate' : 'Activate'}
+            </Menu.Item>
+          </Menu>
+        );
+        return (
+          <Dropdown overlay={menu} trigger={['click']}>
+            <Button icon={<MoreOutlined />} size="small" />
+          </Dropdown>
+        );
+      }
     },
   ].filter(col => !col.hidden);
 
@@ -143,8 +190,15 @@ const UomCategoriesListPageContent: React.FC = () => {
 
       <Card>
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12}><Input.Search placeholder="Search name/code..." onSearch={val => handleFilterChange('search', val)} allowClear /></Col>
-          <Col xs={24} sm={12}><RangePicker style={{ width: '100%' }} onChange={dates => handleFilterChange('updatedAt', dates)} /></Col>
+          <Col xs={24} sm={12} md={8}><Input.Search placeholder="Search name/code..." onSearch={val => handleFilterChange('search', val)} allowClear /></Col>
+          <Col xs={24} sm={12} md={8}>
+            <Select defaultValue="all" style={{ width: '100%' }} onChange={value => handleFilterChange('status', value)}>
+              <Select.Option value="all">All Status</Select.Option>
+              <Select.Option value="active">Active</Select.Option>
+              <Select.Option value="inactive">Inactive</Select.Option>
+            </Select>
+          </Col>
+          <Col xs={24} sm={12} md={8}><RangePicker style={{ width: '100%' }} onChange={dates => handleFilterChange('updatedAt', dates)} /></Col>
         </Row>
       </Card>
 
@@ -152,11 +206,28 @@ const UomCategoriesListPageContent: React.FC = () => {
         <Table dataSource={categories} columns={columns} loading={loading} rowKey="id" size="middle" scroll={{ x: 800 }}/>
       </Card>
 
-      <Modal title={editingRecord ? 'Edit UoM Category' : 'Add New UoM Category'} open={isModalOpen} onOk={handleSave} onCancel={handleCancel} width={600} confirmLoading={loading} destroyOnClose>
+      <Modal 
+        title={editingRecord ? 'Edit UoM Category' : 'Add New UoM Category'} 
+        open={isModalOpen} 
+        onOk={handleSave} 
+        okText={editingRecord ? 'Save' : 'Create'}
+        onCancel={handleCancel} 
+        width={600} 
+        confirmLoading={loading} 
+        destroyOnClose
+      >
         <Form form={form} layout="vertical" name="uom_category_form" style={{ marginTop: 24 }}>
           <Form.Item name="code" label="Code" rules={[{ required: true }]}><Input disabled={!!editingRecord} /></Form.Item>
           <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="description" label="Description"><Input.TextArea rows={3} /></Form.Item>
+          {editingRecord && (
+             <Form.Item name="is_active" label="Status" rules={[{ required: true }]}>
+                <Select>
+                  <Select.Option value={true}>Active</Select.Option>
+                  <Select.Option value={false}>Inactive</Select.Option>
+                </Select>
+              </Form.Item>
+          )}
         </Form>
       </Modal>
     </Space>

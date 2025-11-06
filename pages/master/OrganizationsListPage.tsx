@@ -246,6 +246,7 @@ const OrganizationsListPageContent: React.FC = () => {
         title={editingRecord ? 'Edit Organization' : 'Add New Organization'}
         open={isModalOpen}
         onOk={handleSave}
+        okText={editingRecord ? 'Save' : 'Create'}
         onCancel={handleCancel}
         width={800}
         confirmLoading={loading}
