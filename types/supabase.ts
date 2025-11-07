@@ -1,3 +1,4 @@
+
 export type Json =
   | string
   | number
@@ -115,6 +116,107 @@ export interface Database {
             foreignKeyName: "goods_models_goods_type_id_fkey"
             columns: ["goods_type_id"]
             referencedRelation: "goods_types"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      goods_receipts: {
+        Row: {
+          id: number
+          created_at: string
+          created_by: string | null
+          updated_at: string | null
+          updated_by: string | null
+          reference_number: string | null
+          warehouse_id: number
+          status: Database["public"]["Enums"]["gr_status"]
+          notes: string | null
+          transaction_type: Database["public"]["Enums"]["gr_transaction_type"]
+          partner_name: string | null
+        }
+        Insert: {
+          id?: number
+          created_at?: string
+          created_by?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          reference_number?: string | null
+          warehouse_id: number
+          status: Database["public"]["Enums"]["gr_status"]
+          notes?: string | null
+          transaction_type: Database["public"]["Enums"]["gr_transaction_type"]
+          partner_name?: string | null
+        }
+        Update: {
+          id?: number
+          created_at?: string
+          created_by?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          reference_number?: string | null
+          warehouse_id?: number
+          status?: Database["public"]["Enums"]["gr_status"]
+          notes?: string | null
+          transaction_type?: Database["public"]["Enums"]["gr_transaction_type"]
+          partner_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goods_receipts_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      gr_lines: {
+        Row: {
+          id: number
+          gr_id: number
+          goods_model_id: number
+          expected_qty: number
+          received_qty: number
+          lot_number: string | null
+          serial_number: string | null
+          location_id: number | null
+        }
+        Insert: {
+          id?: number
+          gr_id: number
+          goods_model_id: number
+          expected_qty: number
+          received_qty?: number
+          lot_number?: string | null
+          serial_number?: string | null
+          location_id?: number | null
+        }
+        Update: {
+          id?: number
+          gr_id?: number
+          goods_model_id?: number
+          expected_qty?: number
+          received_qty?: number
+          lot_number?: string | null
+          serial_number?: string | null
+          location_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gr_lines_gr_id_fkey"
+            columns: ["gr_id"]
+            referencedRelation: "goods_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gr_lines_goods_model_id_fkey"
+            columns: ["goods_model_id"]
+            referencedRelation: "goods_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gr_lines_location_id_fkey"
+            columns: ["location_id"]
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           }
         ]
@@ -461,6 +563,8 @@ export interface Database {
       }
     }
     Enums: {
+      gr_status: "DRAFT" | "CREATED" | "RECEIVING" | "PARTIAL_RECEIVED" | "APPROVED" | "COMPLETED"
+      gr_transaction_type: "PURCHASE" | "PRODUCTION" | "RETURN_FROM_CUSTOMER" | "TRANSFER_IN" | "ADJUSTMENT_IN"
       location_constraint_type: "NONE" | "ALLOWED" | "DISALLOWED"
       partner_type: "CUSTOMER" | "SUPPLIER" | "CARRIER" | "OTHER"
       tracking_type_enum: "NONE" | "LOT" | "SERIAL"
@@ -481,3 +585,5 @@ export type Uom = Database['public']['Tables']['uoms']['Row'];
 export type Partner = Database['public']['Tables']['partners']['Row'];
 export type GoodsType = Database['public']['Tables']['goods_types']['Row'];
 export type GoodsModel = Database['public']['Tables']['goods_models']['Row'];
+export type GoodsReceipt = Database['public']['Tables']['goods_receipts']['Row'];
+export type GRLine = Database['public']['Tables']['gr_lines']['Row'];

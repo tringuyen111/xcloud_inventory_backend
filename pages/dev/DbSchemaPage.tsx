@@ -100,11 +100,10 @@ const DbSchemaPage: React.FC = () => {
   ];
 
   const tableItems: TabsProps['items'] = schema?.tables.map(table => ({
-    key: table.name,
-    label: table.name,
+    key: `${table.schema}.${table.name}`,
+    label: `${table.schema}.${table.name}`,
     children: (
       <>
-        <Typography.Title level={5} style={{ marginTop: 0 }}>Table: {table.schema}.{table.name}</Typography.Title>
         <Table
           columns={tableColumns}
           dataSource={table.columns}
@@ -125,17 +124,17 @@ const DbSchemaPage: React.FC = () => {
     {
       key: '2',
       label: `Functions (${schema?.functions?.length || 0})`,
-      children: <Table size="small" pagination={false} rowKey="name" dataSource={schema?.functions} columns={[ { title: 'Function Name', dataIndex: 'name', key: 'name' }, { title: 'Return Type', dataIndex: 'return_type', key: 'return_type' } ]} />,
+      children: <Table size="small" pagination={false} rowKey={(record, index) => `${record.schema}.${record.name}-${index}`} dataSource={schema?.functions} columns={[ { title: 'Function Name', dataIndex: 'name', key: 'name' }, { title: 'Return Type', dataIndex: 'return_type', key: 'return_type' } ]} />,
     },
     {
       key: '3',
       label: `Triggers (${schema?.triggers?.length || 0})`,
-      children: <Table size="small" pagination={false} rowKey="name" dataSource={schema?.triggers} columns={[ { title: 'Trigger Name', dataIndex: 'name' }, { title: 'Table', dataIndex: 'table' }, { title: 'Event', dataIndex: 'event', render: (e: string) => <Tag color={e === 'INSERT' ? 'success' : e === 'UPDATE' ? 'processing' : 'error'}>{e}</Tag> }, { title: 'Timing', dataIndex: 'timing' } ]} />,
+      children: <Table size="small" pagination={false} rowKey={(record) => `${record.table}-${record.name}`} dataSource={schema?.triggers} columns={[ { title: 'Trigger Name', dataIndex: 'name' }, { title: 'Table', dataIndex: 'table' }, { title: 'Event', dataIndex: 'event', render: (e: string) => <Tag color={e === 'INSERT' ? 'success' : e === 'UPDATE' ? 'processing' : 'error'}>{e}</Tag> }, { title: 'Timing', dataIndex: 'timing' } ]} />,
     },
     {
       key: '4',
       label: `Policies (${schema?.policies?.length || 0})`,
-      children: <Table size="small" pagination={false} rowKey="name" dataSource={schema?.policies} columns={[ { title: 'Policy Name', dataIndex: 'name' }, { title: 'Table', dataIndex: 'table' }, { title: 'Command', dataIndex: 'command', render: (c: string) => <Tag>{c}</Tag> }, { title: 'Roles', dataIndex: 'roles', render: (r: string[] | null) => r ? r.join(', ') : 'public' } ]} />,
+      children: <Table size="small" pagination={false} rowKey={(record) => `${record.table}-${record.name}`} dataSource={schema?.policies} columns={[ { title: 'Policy Name', dataIndex: 'name' }, { title: 'Table', dataIndex: 'table' }, { title: 'Command', dataIndex: 'command', render: (c: string) => <Tag>{c}</Tag> } , { title: 'Roles', dataIndex: 'roles', render: (r: string[] | null) => r ? r.join(', ') : 'public' } ]} />,
     },
   ];
 
