@@ -24,8 +24,6 @@ import PageHeader from '../../../components/layout/PageHeader';
 const { Text, Title, Paragraph } = Typography;
 
 // --- Type Definitions for Detailed View ---
-type Profile = { id: string, email: string | null, full_name: string | null };
-
 type LineWithDetails = GRLine & {
     goods_model: {
         code: string;
@@ -37,9 +35,6 @@ type LineWithDetails = GRLine & {
 type GRViewData = GoodsReceipt & {
     warehouses: Warehouse | null;
     gr_lines: LineWithDetails[];
-    created_by_user?: Profile | null;
-    updated_by_user?: Profile | null;
-    completed_by_user?: Profile | null;
 };
 
 // --- Status & Color Mapping ---
@@ -107,7 +102,23 @@ const GRViewPage: React.FC = () => {
     }, [fetchData]);
 
     const handleDelete = () => {
-      // Logic for deleting
+        if (!id) return;
+        modal.confirm({
+            title: 'Are you sure?',
+            content: 'This will delete the goods receipt and all its lines. This action cannot be undone.',
+            okText: 'Yes, delete it',
+            okType: 'danger',
+            onOk: async () => {
+                try {
+                    const { error } = await supabase.from('goods_receipts').delete().eq('id', id);
+                    if (error) throw error;
+                    notification.success({ message: 'Goods Receipt deleted successfully' });
+                    navigate('/operations/gr');
+                } catch (error: any) {
+                    notification.error({ message: 'Failed to delete', description: error.message });
+                }
+            },
+        });
     };
 
     const lineColumns = [
@@ -127,19 +138,21 @@ const GRViewPage: React.FC = () => {
     if (loading) return <div className="flex justify-center items-center h-full"><Spin size="large" /></div>;
     if (error) return <Alert message="Error" description={error} type="error" showIcon />;
     if (!goodsReceipt) return <Alert message="Not Found" description="The requested goods receipt could not be found." type="warning" showIcon />;
+    
+    const pageActions = (
+        <Space>
+            <Button icon={<RollbackOutlined />} onClick={() => navigate('/operations/gr')}>Back to List</Button>
+            <Button icon={<EditOutlined />} onClick={() => navigate(`/operations/gr/${id}/edit`)} disabled={goodsReceipt.status !== 'DRAFT'}>Edit</Button>
+            <Button icon={<DeleteOutlined />} danger onClick={handleDelete} disabled={goodsReceipt.status !== 'DRAFT'}>Delete</Button>
+        </Space>
+    );
 
     return (
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
             <PageHeader
                 title={goodsReceipt.reference_number || `GR-${goodsReceipt.id}`}
                 description="Details for this goods receipt."
-                actions={
-                     <Space>
-                        <Button icon={<RollbackOutlined />} onClick={() => navigate('/operations/gr')}>Back to List</Button>
-                        <Button icon={<EditOutlined />} onClick={() => navigate(`/operations/gr/${id}/edit`)} disabled={goodsReceipt.status !== 'DRAFT'}>Edit</Button>
-                        <Button icon={<DeleteOutlined />} danger onClick={handleDelete} disabled={goodsReceipt.status !== 'DRAFT'}>Delete</Button>
-                    </Space>
-                }
+                actions={pageActions}
             />
             
             <Row gutter={24}>
@@ -184,7 +197,7 @@ const GRViewPage: React.FC = () => {
                     </Space>
                 </Col>
             </Row>
-        </>
+        </Space>
     );
 };
 

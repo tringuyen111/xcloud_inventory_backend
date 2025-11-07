@@ -1,6 +1,8 @@
+
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { Warehouse, Branch } from '../../../types/supabase';
+import { Warehouse, Branch, Database } from '../../../types/supabase';
 import {
     Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Modal, Form, Dropdown, Menu, Typography, DatePicker, Checkbox
 } from 'antd';
@@ -14,7 +16,9 @@ import type { Dayjs } from 'dayjs';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
-const WAREHOUSE_TYPES = ['NORMAL', 'QUARANTINE', 'DAMAGE'];
+
+// Correctly define warehouse types based on the Supabase enum
+const WAREHOUSE_TYPES: Database['public']['Enums']['warehouse_type_enum'][] = ["DC", "STORE", "3PL", "PRODUCTION", "TRANSIT"];
 
 type WarehouseWithBranch = Warehouse & { branches: { name: string } | null };
 
@@ -266,7 +270,7 @@ const WarehousesListPage: React.FC = () => {
                     <Form.Item name="branch_id" label="Branch" rules={[{ required: true }]}><Select options={branches.map(b => ({ label: b.name, value: b.id }))} /></Form.Item>
                     <Form.Item name="code" label="Code" rules={[{ required: true }]}><Input /></Form.Item>
                     <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item>
-                    <Form.Item name="warehouse_type" label="Warehouse Type" initialValue="NORMAL"><Select options={WAREHOUSE_TYPES.map(t => ({ label: t, value: t }))} /></Form.Item>
+                    <Form.Item name="warehouse_type" label="Warehouse Type" initialValue="DC"><Select options={WAREHOUSE_TYPES.map(t => ({ label: t, value: t }))} /></Form.Item>
                     <Form.Item name="is_active" label="Status" initialValue={true}><Select><Select.Option value={true}>Active</Select.Option><Select.Option value={false}>Inactive</Select.Option></Select></Form.Item>
                     <Form.Item name="notes" label="Notes"><Input.TextArea rows={3} /></Form.Item>
                 </Form>

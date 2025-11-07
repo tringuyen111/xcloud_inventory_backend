@@ -1415,10 +1415,12 @@ export interface Database {
         | "COMPLETED"
         | "CANCELLED"
       gi_transaction_type_enum:
-        | "SALE"
+        | "SALES"
+        | "PRODUCTION"
+        | "RETURN_TO_SUPPLIER"
         | "TRANSFER_OUT"
+        | "INTERNAL_USE"
         | "ADJUSTMENT_OUT"
-        | "RETURN_OUT"
         | "SCRAP"
         | "OTHER"
       gr_status_enum:
@@ -1435,27 +1437,30 @@ export interface Database {
         | "TRANSFER_IN"
         | "ADJUSTMENT_IN"
         | "OTHER"
-      gt_status_enum: "CREATED" | "IN_TRANSIT" | "RECEIVED" | "CANCELLED"
+      gt_status_enum:
+        | "CREATED"
+        | "IN_TRANSIT"
+        | "RECEIVING"
+        | "PARTIAL_RECEIVED"
+        | "PENDING_APPROVAL"
+        | "COMPLETED"
       ic_status_enum:
         | "DRAFT"
+        | "CREATED"
         | "COUNTING"
-        | "REVIEW"
-        | "APPROVED"
-        | "ADJUSTED"
+        | "COUNTED"
+        | "COMPLETED"
       issue_mode_enum: "SUMMARY" | "DETAIL"
-      movement_type_enum:
-        | "RECEIPT"
-        | "ISSUE"
-        | "TRANSFER"
-        | "ADJUSTMENT"
-        | "COUNT"
+      movement_type_enum: "GR" | "GI" | "GT" | "IC_ADJUSTMENT" | "PUTAWAY"
+      partner_type_enum: "SUPPLIER" | "CUSTOMER" | "CARRIER" | "OTHER"
       tracking_type_enum: "NONE" | "LOT" | "SERIAL"
       user_role_enum:
-        | "ADMIN"
+        | "SYSTEM_ADMIN"
+        | "ORG_MANAGER"
+        | "BRANCH_MANAGER"
         | "WAREHOUSE_MANAGER"
         | "WAREHOUSE_STAFF"
-        | "GUEST"
-      warehouse_type_enum: "DC" | "STORE" | "CROSS_DOCK"
+      warehouse_type_enum: "DC" | "STORE" | "3PL" | "PRODUCTION" | "TRANSIT"
     }
     CompositeTypes: {
       [_ in never]: never

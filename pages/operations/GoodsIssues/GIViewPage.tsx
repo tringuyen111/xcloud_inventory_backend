@@ -53,7 +53,7 @@ const STATUS_COLOR_MAP: Record<Database['public']['Enums']['gi_status_enum'], st
 const getUserDisplayName = (user: {full_name?: string | null, email?: string | null} | null) => {
     if (!user) return 'System';
     return user.full_name || user.email?.split('@')[0] || 'Unknown User';
-};
+}
 
 const GIViewPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -139,16 +139,25 @@ const GIViewPage: React.FC = () => {
         { title: 'UoM', dataIndex: ['goods_model', 'uoms', 'name'], key: 'uom' },
         { title: 'Planned', dataIndex: 'quantity_planned', key: 'quantity_planned', align: 'right' as const },
         { title: 'Picked', dataIndex: 'quantity_picked', key: 'quantity_picked', align: 'right' as const, render: (qty: number | null) => qty || 0 },
+        // FIX: Use `quantity_picked` instead of `quantity_received` for correct calculation.
         { title: 'Diff', key: 'diff', align: 'right' as const, render: (_:any, record: LineWithDetails) => <Text type={ (record.quantity_planned - (record.quantity_picked || 0)) !== 0 ? 'danger' : undefined }>{record.quantity_planned - (record.quantity_picked || 0)}</Text> },
     ];
     
     if (loading) return <div className="flex justify-center items-center h-full"><Spin size="large" /></div>;
     if (error) return <Alert message="Error" description={error} type="error" showIcon />;
     if (!goodsIssue) return <Alert message="Not Found" description="The requested goods issue could not be found." type="warning" showIcon />;
+    
+    const pageActions = (
+        <Space>
+            <Button icon={<RollbackOutlined />} onClick={() => navigate('/operations/gi')}>Back to List</Button>
+            <Button icon={<EditOutlined />} onClick={() => navigate(`/operations/gi/${id}/edit`)} disabled={goodsIssue.status !== 'DRAFT'}>Edit</Button>
+            <Button icon={<DeleteOutlined />} danger onClick={handleDelete} disabled={goodsIssue.status !== 'DRAFT'}>Delete</Button>
+        </Space>
+    );
 
     const getDestination = () => {
-        if (goodsIssue.transaction_type === 'TRANSFER_OUT') return goodsIssue.to_warehouse?.name;
-        return goodsIssue.partner_name || 'N/A';
+        if (goodsIssue.transaction_type === 'TRANSFER_OUT') return `Warehouse: ${goodsIssue.to_warehouse?.name}`;
+        return `Partner: ${goodsIssue.partner_name || 'N/A'}`;
     };
 
     return (
@@ -174,6 +183,8 @@ const GIViewPage: React.FC = () => {
                                 <Descriptions.Item label="Destination">{getDestination()}</Descriptions.Item>
                                 <Descriptions.Item label="Issue Date">{goodsIssue.issue_date ? format(new Date(goodsIssue.issue_date), 'dd MMM yyyy') : 'N/A'}</Descriptions.Item>
                                 <Descriptions.Item label="Status"><Tag color={STATUS_COLOR_MAP[goodsIssue.status]}>{goodsIssue.status.replace('_', ' ')}</Tag></Descriptions.Item>
+                                <Descriptions.Item label="Issue Mode"><Tag>{goodsIssue.issue_mode}</Tag></Descriptions.Item>
+                                <Descriptions.Item label="Transaction Type"><Tag>{goodsIssue.transaction_type.replace(/_/g, ' ')}</Tag></Descriptions.Item>
                                 <Descriptions.Item label="Notes" span={2}>{goodsIssue.notes || '-'}</Descriptions.Item>
                             </Descriptions>
                         </Card>

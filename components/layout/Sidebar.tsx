@@ -42,8 +42,8 @@ const navItems: NavItem[] = [
     { name: 'Reports', path: '/reports', icon: <ChartBarIcon /> },
     { name: 'Settings', path: '/settings', icon: <CogIcon /> },
     { name: 'Developer', path: '/dev', icon: <CodeIcon />, subItems: [
-        { name: 'DB Schema', path: '/db-schema', icon: <div/> },
-        { name: 'Supabase MCP', path: '/supabase-mcp', icon: <div/> },
+        { name: 'DB Schema', path: '/dev/db-schema', icon: <div/> },
+        { name: 'Supabase MCP', path: '/dev/supabase-mcp', icon: <div/> },
     ]},
 ];
 

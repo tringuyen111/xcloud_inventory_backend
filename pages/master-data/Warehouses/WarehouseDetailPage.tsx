@@ -1,7 +1,9 @@
+
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
-import { Warehouse, Branch } from '../../../types/supabase';
+import { Warehouse, Branch, Database } from '../../../types/supabase';
 import {
   Button, Card, Form, Input, Row, Col, Typography, Space, App, Spin, Select, Descriptions, Tag, Alert
 } from 'antd';
@@ -10,7 +12,7 @@ import { format } from 'date-fns';
 import useAuthStore from '../../../stores/authStore';
 
 const { Title, Text } = Typography;
-const WAREHOUSE_TYPES = ['NORMAL', 'QUARANTINE', 'DAMAGE'];
+const WAREHOUSE_TYPES: Database['public']['Enums']['warehouse_type_enum'][] = ["DC", "STORE", "3PL", "PRODUCTION", "TRANSIT"];
 type WarehouseWithBranch = Warehouse & { branch?: { name: string } };
 
 const WarehouseDetailPageContent: React.FC = () => {
@@ -124,7 +126,7 @@ const WarehouseDetailPageContent: React.FC = () => {
                     <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item>
                 </Col>
                 <Col span={12}>
-                    <Form.Item name="warehouse_type" label="Warehouse Type" initialValue="NORMAL"><Select>{WAREHOUSE_TYPES.map(type => <Select.Option key={type} value={type}>{type}</Select.Option>)}</Select></Form.Item>
+                    <Form.Item name="warehouse_type" label="Warehouse Type" initialValue="DC"><Select>{WAREHOUSE_TYPES.map(type => <Select.Option key={type} value={type}>{type}</Select.Option>)}</Select></Form.Item>
                 </Col>
                 <Col span={12}>
                     <Form.Item name="is_active" label="Status" rules={[{ required: true }]}><Select><Select.Option value={true}>Active</Select.Option><Select.Option value={false}>Inactive</Select.Option></Select></Form.Item>

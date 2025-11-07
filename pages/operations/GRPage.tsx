@@ -1,6 +1,7 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../services/supabaseClient';
+import { supabase } from '../../lib/supabase';
 import { GoodsReceipt, Warehouse } from '../../types/supabase';
 import {
     Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Form, Dropdown, Menu, Typography, DatePicker, Checkbox

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { Warehouse } from '../../../types/supabase';
+import { Warehouse, Database } from '../../../types/supabase';
 import {
     Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Form, Dropdown, Menu, Typography
 } from 'antd';

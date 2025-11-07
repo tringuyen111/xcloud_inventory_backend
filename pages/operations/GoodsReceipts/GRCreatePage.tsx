@@ -215,11 +215,11 @@ const GRCreateEditPage: React.FC = () => {
             if (!isDraft && lines.length === 0) {
                 throw new Error('Please add at least one valid line item.');
             }
-            
+
             const partnerName = headerValues.partner_id 
                 ? partners.find(p => p.id === headerValues.partner_id)?.name || null
                 : null;
-
+            
             const linesToUpsert = lines
                 .filter(l => l.goods_model_id && l.quantity_planned && l.quantity_planned > 0 && l.uom_id && l.tracking_type)
                 .map(l => ({
@@ -262,7 +262,7 @@ const GRCreateEditPage: React.FC = () => {
                 const updatedLines = linesToUpsert.filter(l => l.id);
 
                 if (newLines.length > 0) {
-                    const { error: insertError } = await supabase.from('gr_lines').insert(newLines);
+                    const { error: insertError } = await supabase.from('gr_lines').insert(newLines as any);
                     if (insertError) throw insertError;
                 }
                 if (updatedLines.length > 0) {
@@ -284,11 +284,17 @@ const GRCreateEditPage: React.FC = () => {
                 const { data: headerData, error: headerError } = await supabase
                     .from('goods_receipts')
                     .insert({
-                        ...headerValues,
-                        partner_name: partnerName,
+                        warehouse_id: headerValues.warehouse_id,
+                        receipt_date: headerValues.receipt_date ? dayjs(headerValues.receipt_date).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+                        transaction_type: headerValues.transaction_type,
                         status,
+                        partner_id: headerValues.partner_id || null,
+                        partner_name: partnerName,
+                        partner_reference: headerValues.partner_reference || null,
+                        reference_number: headerValues.reference_number || null,
+                        notes: headerValues.notes || null,
                         created_by: user.id,
-                        receipt_date: headerValues.receipt_date ? dayjs(headerValues.receipt_date).format('YYYY-MM-DD') : null,
+                        warehouse_from_id: headerValues.warehouse_from_id || null,
                     })
                     .select()
                     .single();
@@ -296,14 +302,21 @@ const GRCreateEditPage: React.FC = () => {
                 if (headerError) throw headerError;
                 if (!headerData) throw new Error("Failed to create goods receipt header.");
 
+                const new_gr_id = headerData.id;
+
                 if (linesToUpsert.length > 0) {
-                    const linesWithGrId = linesToUpsert.map(l => ({...l, gr_id: headerData.id}));
-                    const { error: linesError } = await supabase.from('gr_lines').insert(linesWithGrId);
-                    if (linesError) throw linesError;
+                    const linesWithGrId = linesToUpsert.map(l => ({...l, gr_id: new_gr_id}));
+                    const linesToInsert = linesWithGrId.map(({id, ...rest}) => rest); // remove id property for insert
+                    const { error: linesError } = await supabase.from('gr_lines').insert(linesToInsert as any);
+                    if (linesError) {
+                        // Rollback header insert if lines fail
+                        await supabase.from('goods_receipts').delete().eq('id', new_gr_id);
+                        throw linesError;
+                    }
                 }
 
-                notification.success({ message: `Goods Receipt successfully created (ID: ${headerData.id})` });
-                navigate(`/operations/gr/${headerData.id}`);
+                notification.success({ message: `Goods Receipt successfully created (ID: ${new_gr_id})` });
+                navigate(`/operations/gr/${new_gr_id}`);
             }
     
         } catch (error: any) {

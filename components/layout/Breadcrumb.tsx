@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { Breadcrumb as AntBreadcrumb } from 'antd';
@@ -26,12 +25,14 @@ const pathNameMapping: { [key: string]: string } = {
   'goods-models': 'Goods Models',
   reports: 'Reports',
   settings: 'Settings',
+  dev: 'Developer',
   'db-schema': 'DB Schema',
+  'supabase-mcp': 'Supabase MCP',
   create: 'Create',
   edit: 'Edit'
 };
 
-const nonLinkablePaths = ['operations', 'master-data'];
+const nonLinkablePaths = ['operations', 'master-data', 'dev'];
 
 const Breadcrumb: React.FC = () => {
   const location = useLocation();
