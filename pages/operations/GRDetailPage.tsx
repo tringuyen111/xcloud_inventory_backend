@@ -88,7 +88,7 @@ const GRDetailPageContent: React.FC = () => {
         { title: 'No.', dataIndex: 'index', render: (_:any, __:any, index: number) => index + 1, width: 50 },
         { title: 'Goods Model', dataIndex: ['goods_model', 'name'], key: 'goods_model' },
         { title: 'Expected Qty', dataIndex: 'expected_qty', key: 'expected_qty', align: 'right' as const },
-        { title: 'Received Qty', dataIndex: 'received_qty', key: 'received_qty', align: 'right' as const, render: (qty: number) => qty || 0 },
+        { title: 'Received Qty', dataIndex: 'actual_qty', key: 'actual_qty', align: 'right' as const, render: (qty: number | null) => qty || 0 },
         { title: 'UoM', dataIndex: ['goods_model', 'base_uom', 'name'], key: 'uom' },
         { title: 'Lot/Serial', key: 'lot_serial', render: (_: any, record: GRLine) => record.lot_number || record.serial_number || '-' },
     ];

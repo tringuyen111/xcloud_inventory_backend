@@ -124,6 +124,8 @@ export interface Database {
       goods_receipts: {
         Row: {
           id: number
+          // FIX: Add missing reference_number property to fix type errors in detail and list pages.
+          reference_number: string | null
           created_at: string
           created_by: string | null
           updated_at: string | null
@@ -138,6 +140,8 @@ export interface Database {
         }
         Insert: {
           id?: number
+          // FIX: Add missing reference_number property.
+          reference_number?: string | null
           created_at?: string
           created_by?: string | null
           updated_at?: string | null
@@ -152,6 +156,8 @@ export interface Database {
         }
         Update: {
           id?: number
+          // FIX: Add missing reference_number property.
+          reference_number?: string | null
           created_at?: string
           created_by?: string | null
           updated_at?: string | null
@@ -179,7 +185,7 @@ export interface Database {
           gr_id: number
           goods_model_id: number
           expected_qty: number
-          received_qty: number
+          actual_qty: number | null
           lot_number: string | null
           serial_number: string | null
           location_id: number | null
@@ -189,7 +195,7 @@ export interface Database {
           gr_id: number
           goods_model_id: number
           expected_qty: number
-          received_qty?: number
+          actual_qty?: number | null
           lot_number?: string | null
           serial_number?: string | null
           location_id?: number | null
@@ -199,7 +205,7 @@ export interface Database {
           gr_id?: number
           goods_model_id?: number
           expected_qty?: number
-          received_qty?: number
+          actual_qty?: number | null
           lot_number?: string | null
           serial_number?: string | null
           location_id?: number | null
