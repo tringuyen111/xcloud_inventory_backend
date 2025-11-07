@@ -127,7 +127,8 @@ export interface Database {
           created_by: string | null
           updated_at: string | null
           updated_by: string | null
-          reference_number: string | null
+          receipt_date: string
+          partner_reference: string | null
           warehouse_id: number
           status: Database["public"]["Enums"]["gr_status"]
           notes: string | null
@@ -140,7 +141,8 @@ export interface Database {
           created_by?: string | null
           updated_at?: string | null
           updated_by?: string | null
-          reference_number?: string | null
+          receipt_date: string
+          partner_reference?: string | null
           warehouse_id: number
           status: Database["public"]["Enums"]["gr_status"]
           notes?: string | null
@@ -153,7 +155,8 @@ export interface Database {
           created_by?: string | null
           updated_at?: string | null
           updated_by?: string | null
-          reference_number?: string | null
+          receipt_date?: string
+          partner_reference?: string | null
           warehouse_id?: number
           status?: Database["public"]["Enums"]["gr_status"]
           notes?: string | null

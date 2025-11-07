@@ -10,6 +10,7 @@ import DashboardPage from './pages/dashboard/DashboardPage';
 import OnhandPage from './pages/onhand/OnhandPage';
 import GRPage from './pages/operations/GRPage';
 import GRCreatePage from './pages/operations/GRCreatePage';
+import GRCreate from './pages/operations/GRCreate'; // New Component
 import GRDetailPage from './pages/operations/GRDetailPage';
 import GIPage from './pages/operations/GIPage';
 import ICPage from './pages/operations/ICPage';
@@ -85,7 +86,7 @@ const App: React.FC = () => {
                                 
                                 {/* Operations */}
                                 <Route path="/operations/gr" element={<GRPage />} />
-                                <Route path="/operations/gr/new" element={<GRCreatePage />} />
+                                <Route path="/operations/gr/create" element={<GRCreate />} />
                                 <Route path="/operations/gr/:id" element={<GRDetailPage />} />
                                 <Route path="/operations/gr/:id/edit" element={<GRCreatePage isEditMode={true} />} />
                                 <Route path="/operations/gi" element={<GIPage />} />

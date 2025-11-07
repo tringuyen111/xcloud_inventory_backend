@@ -242,7 +242,7 @@ const GoodsReceiptListPage: React.FC = () => {
                         <Dropdown overlay={columnsMenu} trigger={['click']}>
                             <Button icon={<ProfileOutlined />}>Columns <DownOutlined /></Button>
                         </Dropdown>
-                        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/gr/new')}>Create</Button>
+                        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/gr/create')}>Create</Button>
                     </Space>
                 </Col>
             </Row>
