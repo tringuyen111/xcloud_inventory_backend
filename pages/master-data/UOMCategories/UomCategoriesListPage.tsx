@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../services/supabaseClient';
+import { supabase } from '../../../lib/supabase';
 import { UomCategory } from '../../../types/supabase';
 import {
     Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Modal, Form, Dropdown, Menu, Typography, DatePicker, Checkbox
@@ -10,7 +9,7 @@ import {
     PlusOutlined, ExportOutlined, ProfileOutlined, EllipsisOutlined, EyeOutlined, EditOutlined, DeleteOutlined, DownOutlined
 } from '@ant-design/icons';
 import useAuthStore from '../../../stores/authStore';
-import type { TableProps, FormInstance } from 'antd';
+import type { TableProps } from 'antd';
 import type { Dayjs } from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -33,7 +32,7 @@ const UomCategoriesListPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const { notification, modal } = App.useApp();
     const navigate = useNavigate();
-    const [form] = Form.useForm<any>();
+    const [form] = Form.useForm();
     const user = useAuthStore((state) => state.user);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -233,10 +232,21 @@ const UomCategoriesListPage: React.FC = () => {
 
             <Modal title="Create UoM Category" open={isModalOpen} onOk={handleSave} onCancel={handleCancel} confirmLoading={isSaving} okText="Save">
                 <Form form={form} layout="vertical" name="create_uom_cat_form" className="mt-6">
-                    <Form.Item name="code" label="Code" rules={[{ required: true }]}><Input /></Form.Item>
-                    <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item>
-                    <Form.Item name="is_active" label="Status" initialValue={true}><Select><Select.Option value={true}>Active</Select.Option><Select.Option value={false}>Inactive</Select.Option></Select></Form.Item>
-                    <Form.Item name="description" label="Notes"><Input.TextArea rows={3} /></Form.Item>
+                    <Form.Item name="code" label="Code" rules={[{ required: true, message: 'Please input the code!' }]}>
+                        <Input />
+                    </Form.Item>
+                    <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Please input the name!' }]}>
+                        <Input />
+                    </Form.Item>
+                    <Form.Item name="description" label="Notes">
+                        <Input.TextArea rows={3} />
+                    </Form.Item>
+                    <Form.Item name="is_active" label="Status" initialValue={true}>
+                        <Select>
+                            <Select.Option value={true}>Active</Select.Option>
+                            <Select.Option value={false}>Inactive</Select.Option>
+                        </Select>
+                    </Form.Item>
                 </Form>
             </Modal>
         </Card>

@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../../../services/supabaseClient';
+import { supabase } from '../../../lib/supabase';
 import { GoodsModel, GoodsType, Uom } from '../../../types/supabase';
 import {
   Button, Card, Form, Input, Row, Col, Space, App, Spin, Select, Descriptions, Tag, Alert, Upload, Carousel, Image as AntdImage

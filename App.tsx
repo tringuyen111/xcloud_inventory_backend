@@ -1,7 +1,5 @@
 
-
 import React from 'react';
-// FIX: Corrected react-router-dom import.
 import { HashRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { App as AntdApp, ConfigProvider, Spin } from 'antd';
 import AppLayout from './components/layout/AppLayout';
@@ -13,9 +11,9 @@ import DashboardPage from './pages/dashboard/DashboardPage';
 import OnhandPage from './pages/onhand/OnhandPage';
 
 // Operations Pages
-import GRListPage from './pages/operations/GoodsReceipts/GRListPage';
-import GRCreatePage from './pages/operations/GoodsReceipts/GRCreatePage';
-import GRViewPage from './pages/operations/GoodsReceipts/GRViewPage';
+import GRListPage from './pages/operations/GRPage';
+import GRCreatePage from './pages/operations/GRCreatePage';
+import GRViewPage from './pages/operations/GRDetailPage';
 import GIListPage from './pages/operations/GIPage';
 import GICreatePage from './pages/operations/GoodsIssues/GICreatePage';
 import GIViewPage from './pages/operations/GoodsIssues/GIViewPage';
@@ -24,29 +22,30 @@ import GTPage from './pages/operations/GTPage';
 import PAPage from './pages/operations/PAPage';
 
 // Master Data Pages
-import GoodsTypesListPage from './pages/master-data/GoodsTypes/GoodsTypesListPage';
-import GoodsTypeDetailPage from './pages/master-data/GoodsTypes/GoodsTypeDetailPage';
-import GoodsModelsListPage from './pages/master-data/GoodsModels/GoodsModelsListPage';
-import GoodsModelDetailPage from './pages/master-data/GoodsModels/GoodsModelDetailPage';
-import OrganizationsListPage from './pages/master-data/Organizations/OrganizationsListPage';
-import OrganizationDetailPage from './pages/master-data/Organizations/OrganizationDetailPage';
-import BranchesListPage from './pages/master-data/Branches/BranchesListPage';
-import BranchDetailPage from './pages/master-data/Branches/BranchDetailPage';
-import WarehousesListPage from './pages/master-data/Warehouses/WarehousesListPage';
-import WarehouseDetailPage from './pages/master-data/Warehouses/WarehouseDetailPage';
-import LocationsListPage from './pages/master-data/Locations/LocationsListPage';
-import LocationDetailPage from './pages/master-data/Locations/LocationDetailPage';
-import UomCategoriesListPage from './pages/master-data/UOMCategories/UomCategoriesListPage';
-import UomCategoryDetailPage from './pages/master-data/UOMCategories/UomCategoryDetailPage';
-import UomsListPage from './pages/master-data/UOMs/UomsListPage';
-import UomDetailPage from './pages/master-data/UOMs/UomDetailPage';
-import PartnersListPage from './pages/master-data/Partners/PartnersListPage';
-import PartnerDetailPage from './pages/master-data/Partners/PartnerDetailPage';
+import GoodsTypesListPage from './pages/goods/GoodsTypesListPage';
+import GoodsTypeDetailPage from './pages/goods/GoodsTypeDetailPage';
+import GoodsModelsListPage from './pages/goods/GoodsModelsListPage';
+import GoodsModelDetailPage from './pages/goods/GoodsModelDetailPage';
+import OrganizationsListPage from './pages/master/OrganizationsListPage';
+import OrganizationDetailPage from './pages/master/OrganizationDetailPage';
+import BranchesListPage from './pages/master/BranchesListPage';
+import BranchDetailPage from './pages/master/BranchDetailPage';
+import WarehousesListPage from './pages/master/WarehousesListPage';
+import WarehouseDetailPage from './pages/master/WarehouseDetailPage';
+import LocationsListPage from './pages/master/LocationsListPage';
+import LocationDetailPage from './pages/master/LocationDetailPage';
+import UomCategoriesListPage from './pages/master/UomCategoriesListPage';
+import UomCategoryDetailPage from './pages/master/UomCategoryDetailPage';
+import UomsListPage from './pages/master/UomsListPage';
+import UomDetailPage from './pages/master/UomDetailPage';
+import PartnersListPage from './pages/master/PartnersListPage';
+import PartnerDetailPage from './pages/master/PartnerDetailPage';
 
 // Other Pages
 import ReportsPage from './pages/reports/ReportsPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import DbSchemaPage from './pages/dev/DbSchemaPage';
+import SupabaseMcpPage from './pages/dev/SupabaseMcpPage';
 
 const PrivateRoute: React.FC = () => {
     const { session, loading } = useAuthStore();
@@ -131,6 +130,7 @@ const App: React.FC = () => {
                                 <Route path="/reports" element={<ReportsPage />} />
                                 <Route path="/settings" element={<SettingsPage />} />
                                 <Route path="/db-schema" element={<DbSchemaPage />} />
+                                <Route path="/supabase-mcp" element={<SupabaseMcpPage />} />
                             </Route>
                             <Route path="*" element={<Navigate to="/" />} />
                         </Routes>

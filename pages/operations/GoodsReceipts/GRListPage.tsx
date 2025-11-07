@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../services/supabaseClient';
-import { GoodsReceipt, Warehouse } from '../../../types/supabase';
+import { supabase } from '../../../lib/supabase';
+import { Warehouse, Database } from '../../../types/supabase';
 import {
     Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Form, Dropdown, Menu, Typography, DatePicker, Checkbox
 } from 'antd';
@@ -15,34 +15,42 @@ import { format } from 'date-fns';
 
 const { Title, Text } = Typography;
 
-type GoodsReceiptWithDetails = GoodsReceipt & {
-    warehouse: { id: number; name: string } | null;
-    gr_lines: { count: number }[];
+// This type should match the structure of your v_goods_receipts_summary view
+type GoodsReceiptSummary = {
+    id: number;
+    reference_number: string;
+    warehouse_id: number;
+    warehouse_name: string;
+    partner_name: string;
+    status: 'DRAFT' | 'CREATED' | 'RECEIVING' | 'PARTIAL_RECEIVED' | 'APPROVED' | 'COMPLETED';
+    total_lines: number;
+    created_at: string;
 };
 
-const GR_STATUSES: GoodsReceipt['status'][] = ['DRAFT', 'CREATED', 'RECEIVING', 'PARTIAL_RECEIVED', 'APPROVED', 'COMPLETED'];
 
-const STATUS_COLOR_MAP: Record<GoodsReceipt['status'], string> = {
-    DRAFT: '#FFC107',
-    CREATED: '#2196F3',
-    RECEIVING: '#FF9800',
-    PARTIAL_RECEIVED: '#9C27B0',
-    APPROVED: '#009688',
-    COMPLETED: '#4CAF50',
+const GR_STATUSES: GoodsReceiptSummary['status'][] = ['DRAFT', 'CREATED', 'RECEIVING', 'PARTIAL_RECEIVED', 'APPROVED', 'COMPLETED'];
+
+const STATUS_COLOR_MAP: Record<GoodsReceiptSummary['status'], string> = {
+    DRAFT: 'gold',
+    CREATED: 'blue',
+    RECEIVING: 'orange',
+    PARTIAL_RECEIVED: 'purple',
+    APPROVED: 'cyan',
+    COMPLETED: 'green',
 };
 
-const defaultColumns: TableProps<GoodsReceiptWithDetails>['columns'] = [
+const defaultColumns: TableProps<GoodsReceiptSummary>['columns'] = [
     { title: 'Reference No.', dataIndex: 'reference_number', key: 'reference_number' },
-    { title: 'Warehouse', dataIndex: ['warehouse', 'name'], key: 'warehouse' },
+    { title: 'Warehouse', dataIndex: 'warehouse_name', key: 'warehouse' },
     { title: 'Partner', dataIndex: 'partner_name', key: 'partner_name' },
     { title: 'Status', dataIndex: 'status', key: 'status' },
-    { title: 'Total Lines', dataIndex: 'gr_lines', key: 'total_lines', align: 'center' },
+    { title: 'Total Lines', dataIndex: 'total_lines', key: 'total_lines', align: 'center' },
     { title: 'Created At', dataIndex: 'created_at', key: 'created_at' },
     { title: 'Actions', key: 'action', align: 'center' as const },
 ];
 
 const GoodsReceiptListPage: React.FC = () => {
-    const [goodsReceipts, setGoodsReceipts] = useState<GoodsReceiptWithDetails[]>([]);
+    const [goodsReceipts, setGoodsReceipts] = useState<GoodsReceiptSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const { notification, modal } = App.useApp();
     const navigate = useNavigate();
@@ -56,9 +64,10 @@ const GoodsReceiptListPage: React.FC = () => {
     const fetchData = useCallback(async (page: number, pageSize: number, currentFilters: any) => {
         setLoading(true);
         try {
+            // Using the view for optimized data fetching
             let query = supabase
-                .from('goods_receipts')
-                .select('*, warehouse:warehouses(id, name), gr_lines(count)', { count: 'exact' });
+                .from('v_goods_receipts_summary')
+                .select('*', { count: 'exact' });
 
             if (currentFilters.warehouse_id) query = query.eq('warehouse_id', currentFilters.warehouse_id);
             if (currentFilters.status) query = query.eq('status', currentFilters.status);
@@ -69,8 +78,8 @@ const GoodsReceiptListPage: React.FC = () => {
                 .range((page - 1) * pageSize, page * pageSize - 1);
 
             if (error) throw error;
-            setGoodsReceipts(data as GoodsReceiptWithDetails[] || []);
-            setPagination(prev => ({ ...prev, total: count || 0 }));
+            setGoodsReceipts(data as GoodsReceiptSummary[] || []);
+            setPagination(prev => ({ ...prev, total: count || 0, current: page, pageSize }));
         } catch (error: any) {
             notification.error({ message: "Error fetching goods receipts", description: error.message });
         } finally {
@@ -130,7 +139,7 @@ const GoodsReceiptListPage: React.FC = () => {
         });
     };
     
-    const exportToCsv = (filename: string, data: GoodsReceiptWithDetails[]) => {
+    const exportToCsv = (filename: string, data: GoodsReceiptSummary[]) => {
         const visibleCols = defaultColumns.filter(c => visibleColumns.includes(c.key as string) && c.key !== 'action');
         const header = visibleCols.map(c => c.title).join(',');
         const rows = data.map(row => 
@@ -138,12 +147,10 @@ const GoodsReceiptListPage: React.FC = () => {
                 let value;
                 if (Array.isArray(col.dataIndex)) {
                     value = col.dataIndex.reduce((obj, key) => (obj && obj[key] !== undefined) ? obj[key] : '', row as any);
-                } else if (col.key === 'total_lines') {
-                    value = row.gr_lines[0]?.count ?? 0;
                 } else if (col.key === 'created_at') {
                     value = format(new Date(row.created_at), 'yyyy-MM-dd HH:mm');
                 } else {
-                    value = row[col.dataIndex as keyof GoodsReceiptWithDetails];
+                    value = row[col.dataIndex as keyof GoodsReceiptSummary];
                 }
                 if (value === null || value === undefined) return '';
                 return `"${String(value).replace(/"/g, '""')}"`;
@@ -188,8 +195,8 @@ const GoodsReceiptListPage: React.FC = () => {
         </Menu>
     );
 
-    const getColumns = (): TableProps<GoodsReceiptWithDetails>['columns'] => {
-        const actionMenu = (record: GoodsReceiptWithDetails) => (
+    const getColumns = (): TableProps<GoodsReceiptSummary>['columns'] => {
+        const actionMenu = (record: GoodsReceiptSummary) => (
             <Menu>
                 <Menu.Item key="1" icon={<EyeOutlined />} onClick={() => navigate(`/operations/gr/${record.id}`)}>View</Menu.Item>
                 <Menu.Item key="2" icon={<EditOutlined />} onClick={() => navigate(`/operations/gr/${record.id}/edit`)}>Edit</Menu.Item>
@@ -208,10 +215,7 @@ const GoodsReceiptListPage: React.FC = () => {
                     newCol.render = (text) => text ? format(new Date(text), 'yyyy-MM-dd HH:mm') : '-';
                     break;
                 case 'status':
-                    newCol.render = (status: GoodsReceipt['status']) => <Tag color={STATUS_COLOR_MAP[status]}>{status}</Tag>;
-                    break;
-                case 'total_lines':
-                    newCol.render = (_, record) => record.gr_lines[0]?.count ?? 0;
+                    newCol.render = (status: GoodsReceiptSummary['status']) => <Tag color={STATUS_COLOR_MAP[status]}>{status}</Tag>;
                     break;
                 case 'action':
                     newCol.render = (_, record) => (

@@ -1,7 +1,8 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../../../services/supabaseClient';
+import { supabase } from '../../../lib/supabase';
 import { Uom, UomCategory } from '../../../types/supabase';
 import {
   Button, Card, Form, Input, Row, Col, Typography, Space, App, Spin, Select, Descriptions, Tag, Alert, InputNumber

@@ -1,7 +1,5 @@
-
 import React, { useState } from 'react';
-import { supabase } from '../../services/supabaseClient';
-// FIX: Aliased Card import to avoid potential name collisions.
+import { supabase } from '../../lib/supabase';
 import { Form, Input, Button, Alert, Typography, Card as AntdCard } from 'antd';
 import { MailOutlined, LockOutlined } from '@ant-design/icons';
 

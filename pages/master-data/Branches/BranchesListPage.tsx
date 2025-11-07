@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../services/supabaseClient';
+import { supabase } from '../../../lib/supabase';
 import { Branch, Organization } from '../../../types/supabase';
 import {
     Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Modal, Form, Dropdown, Menu, Typography, DatePicker, Checkbox
@@ -10,7 +9,7 @@ import {
     PlusOutlined, ExportOutlined, ProfileOutlined, EllipsisOutlined, EyeOutlined, EditOutlined, DeleteOutlined, DownOutlined
 } from '@ant-design/icons';
 import useAuthStore from '../../../stores/authStore';
-import type { TableProps, FormInstance } from 'antd';
+import type { TableProps } from 'antd';
 import type { Dayjs } from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -36,7 +35,7 @@ const BranchesListPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const { notification, modal } = App.useApp();
     const navigate = useNavigate();
-    const [form] = Form.useForm<any>();
+    const [form] = Form.useForm();
     const user = useAuthStore((state) => state.user);
     
     const [isModalOpen, setIsModalOpen] = useState(false);

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import { GoodsReceipt, Warehouse } from '../../types/supabase';
@@ -58,7 +59,7 @@ const GoodsReceiptListPage: React.FC = () => {
         try {
             let query = supabase
                 .from('goods_receipts')
-                .select('*, warehouse:warehouses(id, name), gr_lines(count)', { count: 'exact' });
+                .select('*, warehouse:warehouses!warehouse_id(id, name), gr_lines(count)', { count: 'exact' });
 
             if (currentFilters.warehouse_id) query = query.eq('warehouse_id', currentFilters.warehouse_id);
             if (currentFilters.status) query = query.eq('status', currentFilters.status);

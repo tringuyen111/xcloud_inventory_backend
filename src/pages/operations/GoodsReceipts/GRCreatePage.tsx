@@ -21,6 +21,7 @@ import {
     Popconfirm,
     InputNumber,
     Typography,
+    Tag,
     DatePicker,
     AutoComplete
 } from 'antd';
@@ -51,18 +52,17 @@ type EditableLine = {
     id?: number;
     goods_model_id?: number;
     location_id?: number | null;
-    quantity_planned?: number;
-    quantity_received?: number | null;
+    expected_qty?: number;
+    actual_qty?: number | null;
     lot_number?: string | null;
     serial_number?: string | null;
     expiry_date?: string | null;
     uom_name?: string;
-    uom_id?: number;
     tracking_type?: 'NONE' | 'LOT' | 'SERIAL';
 };
 
 const GR_TRANSACTION_TYPES: GRTransactionType[] = [
-    "PURCHASE", "PRODUCTION", "RETURN_FROM_CUSTOMER", "TRANSFER_IN", "ADJUSTMENT_IN", "OTHER"
+    "PURCHASE", "PRODUCTION", "RETURN_FROM_CUSTOMER", "TRANSFER_IN", "ADJUSTMENT_IN"
 ];
 
 // --- Main Component ---
@@ -73,7 +73,6 @@ const GRCreateEditPage: React.FC = () => {
     const { notification } = App.useApp();
     const user = useAuthStore((state) => state.user);
     const selectedWarehouseId = Form.useWatch('warehouse_id', form);
-    const transactionType = Form.useWatch('transaction_type', form);
     
     const isEditMode = !!grId;
 
@@ -128,11 +127,12 @@ const GRCreateEditPage: React.FC = () => {
                 const model = currentGoodsModels.find(m => m.id === line.goods_model_id);
                 return {
                     ...line,
+                    expected_qty: line.quantity_planned,
+                    actual_qty: line.quantity_received,
                     key: -(index + 1), // Use negative keys for existing items
                     uom_name: model?.base_uom?.name || '',
-                    uom_id: model?.base_uom?.id,
                     tracking_type: model?.tracking_type,
-                    expiry_date: line.expiry_date ? dayjs(line.expiry_date).toString() : undefined,
+                    expiry_date: line.expiry_date ? dayjs(line.expiry_date) : null
                 };
             });
             setLines(loadedLines);
@@ -164,7 +164,7 @@ const GRCreateEditPage: React.FC = () => {
 
     useEffect(() => {
         if (selectedWarehouseId) {
-            supabase.from('locations').select('id, name, code').eq('warehouse_id', selectedWarehouseId).eq('is_active', true)
+            supabase.from('locations').select('id, name').eq('warehouse_id', selectedWarehouseId).eq('is_active', true)
                 .then(({ data, error }) => {
                     if (error) notification.error({ message: 'Failed to fetch locations', description: error.message });
                     else setLocations(data || []);
@@ -176,18 +176,21 @@ const GRCreateEditPage: React.FC = () => {
 
     // --- UI Handlers for Lines ---
     const handleAddLine = () => {
-        setLines(prev => [...prev, { key: nextKey, quantity_planned: 1 }]);
+        setLines(prev => [...prev, { key: nextKey, expected_qty: 1 }]);
         setNextKey(p => p + 1);
     }
 
     const handleLineChange = (key: number, field: keyof EditableLine, value: any) => {
+        if (field === 'goods_model_id' && value && lines.some(line => line.goods_model_id === value && line.key !== key)) {
+            notification.warning({ message: "Model already added. Please edit the existing line." });
+            return;
+        }
         setLines(currentLines => currentLines.map(line => {
             if (line.key === key) {
                 const updatedLine = { ...line, [field]: value };
                 if (field === 'goods_model_id') {
                     const model = goodsModels.find(m => m.id === value);
                     updatedLine.uom_name = model?.base_uom?.name;
-                    updatedLine.uom_id = model?.base_uom?.id;
                     updatedLine.tracking_type = model?.tracking_type;
                 }
                 return updatedLine;
@@ -213,97 +216,89 @@ const GRCreateEditPage: React.FC = () => {
             const status = isDraft ? 'DRAFT' : 'CREATED';
     
             if (!isDraft && lines.length === 0) {
-                throw new Error('Please add at least one valid line item.');
+                throw new Error('Please add at least one line item.');
             }
             
-            const partnerName = headerValues.partner_id 
-                ? partners.find(p => p.id === headerValues.partner_id)?.name || null
-                : null;
-
-            const linesToUpsert = lines
-                .filter(l => l.goods_model_id && l.quantity_planned && l.quantity_planned > 0 && l.uom_id && l.tracking_type)
+            const createLinesData = lines
+                .filter(l => l.goods_model_id && l.expected_qty && l.expected_qty > 0)
                 .map(l => ({
                     id: l.id,
                     goods_model_id: l.goods_model_id!,
-                    uom_id: l.uom_id!,
-                    tracking_type: l.tracking_type!,
                     location_id: l.location_id || null,
-                    quantity_planned: l.quantity_planned!,
-                    quantity_received: l.quantity_received ?? 0,
+                    expected_qty: l.expected_qty!,
+                    actual_qty: l.actual_qty ?? 0,
                     lot_number: l.lot_number || null,
                     serial_number: l.serial_number || null,
                     expiry_date: l.expiry_date ? dayjs(l.expiry_date).format('YYYY-MM-DD') : null,
                 }));
             
-            if (!isDraft && linesToUpsert.length === 0) {
-                throw new Error('All line items must have a Goods Model and a valid Planned Quantity.');
+            const updateLinesData = lines
+                .filter(l => l.goods_model_id && l.expected_qty && l.expected_qty > 0)
+                .map(l => ({
+                    id: l.id,
+                    goods_model_id: l.goods_model_id!,
+                    location_id: l.location_id || null,
+                    quantity_planned: l.expected_qty!,
+                    quantity_received: l.actual_qty ?? 0,
+                    lot_number: l.lot_number || null,
+                    serial_number: l.serial_number || null,
+                    expiry_date: l.expiry_date ? dayjs(l.expiry_date).format('YYYY-MM-DD') : null,
+                }));
+            
+            if (!isDraft && createLinesData.length === 0) {
+                throw new Error('All line items must have a Goods Model and a valid Expected Quantity.');
             }
     
             if (isEditMode) {
-                // UPDATE LOGIC
-                const { data: headerData, error: headerError } = await supabase
-                    .from('goods_receipts')
-                    .update({
-                        ...headerValues,
-                        status,
-                        receipt_date: headerValues.receipt_date ? dayjs(headerValues.receipt_date).format('YYYY-MM-DD') : null,
-                        partner_name: partnerName,
-                        updated_by: user.id,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', grId)
-                    .select()
-                    .single();
-                
-                if (headerError) throw headerError;
-                if (!headerData) throw new Error("Failed to update GR header.");
+                // Handle Update
+                const { data: gr, error } = await supabase.from('goods_receipts').update({
+                    ...headerValues,
+                    status,
+                    receipt_date: headerValues.receipt_date ? dayjs(headerValues.receipt_date).format('YYYY-MM-DD') : null,
+                    updated_by: user.id,
+                    updated_at: new Date().toISOString()
+                }).eq('id', grId).select().single();
+                if (error) throw error;
 
-                const newLines = linesToUpsert.filter(l => !l.id).map(l => ({ ...l, gr_id: headerData.id }));
-                const updatedLines = linesToUpsert.filter(l => l.id);
+                // Handle Lines
+                const newLines = updateLinesData.filter(l => !l.id).map(l => ({...l, gr_id: gr.id}));
+                const updatedLines = updateLinesData.filter(l => l.id);
+                const upserts = [...newLines, ...updatedLines];
 
-                if (newLines.length > 0) {
-                    const { error: insertError } = await supabase.from('gr_lines').insert(newLines);
-                    if (insertError) throw insertError;
+                if (upserts.length > 0) {
+                    const { error: lineError } = await supabase.from('gr_lines').upsert(upserts as any);
+                    if (lineError) throw lineError;
                 }
-                if (updatedLines.length > 0) {
-                    for (const line of updatedLines) {
-                        const { error: updateError } = await supabase.from('gr_lines').update(line).eq('id', line.id!);
-                        if (updateError) throw updateError;
-                    }
-                }
+
                 if (linesToDelete.length > 0) {
                     const { error: deleteError } = await supabase.from('gr_lines').delete().in('id', linesToDelete);
                     if (deleteError) throw deleteError;
                 }
                 
-                notification.success({ message: `Goods Receipt successfully updated (ID: ${headerData.id})` });
-                navigate(`/operations/gr/${headerData.id}`);
+                notification.success({ message: `Goods Receipt successfully updated (ID: ${gr.id})` });
+                navigate(`/operations/gr/${gr.id}`);
 
             } else {
-                // CREATE LOGIC
-                const { data: headerData, error: headerError } = await supabase
-                    .from('goods_receipts')
-                    .insert({
-                        ...headerValues,
-                        partner_name: partnerName,
-                        status,
-                        created_by: user.id,
-                        receipt_date: headerValues.receipt_date ? dayjs(headerValues.receipt_date).format('YYYY-MM-DD') : null,
-                    })
-                    .select()
-                    .single();
+                // Handle Create
+                const { data, error: rpcError } = await supabase.rpc(
+                    'create_goods_receipt_with_lines', {
+                        p_warehouse_id: headerValues.warehouse_id,
+                        p_receipt_date: headerValues.receipt_date ? dayjs(headerValues.receipt_date).format('YYYY-MM-DD') : null,
+                        p_transaction_type: headerValues.transaction_type,
+                        p_status: status,
+                        p_supplier_id: headerValues.supplier_id || null,
+                        p_partner_name: headerValues.supplier_id ? partners.find(p => p.id === headerValues.supplier_id)?.name || null : null,
+                        p_partner_reference: headerValues.partner_reference || null,
+                        p_reference_number: headerValues.reference_number || null,
+                        p_notes: headerValues.notes || null,
+                        p_lines: createLinesData
+                    }
+                );
+    
+                if (rpcError) throw rpcError;
 
-                if (headerError) throw headerError;
-                if (!headerData) throw new Error("Failed to create goods receipt header.");
-
-                if (linesToUpsert.length > 0) {
-                    const linesWithGrId = linesToUpsert.map(l => ({...l, gr_id: headerData.id}));
-                    const { error: linesError } = await supabase.from('gr_lines').insert(linesWithGrId);
-                    if (linesError) throw linesError;
-                }
-
-                notification.success({ message: `Goods Receipt successfully created (ID: ${headerData.id})` });
-                navigate(`/operations/gr/${headerData.id}`);
+                notification.success({ message: `Goods Receipt successfully created (ID: ${data})` });
+                navigate(`/operations/gr/${data}`);
             }
     
         } catch (error: any) {
@@ -325,17 +320,17 @@ const GRCreateEditPage: React.FC = () => {
             <Select showSearch allowClear value={record.goods_model_id} placeholder="Search model..." options={goodsModelOptions} onChange={(value) => handleLineChange(record.key, 'goods_model_id', value)} filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())} style={{ width: '100%' }} />
         )},
         { title: 'UoM', dataIndex: 'uom_name', width: '8%', render: (text: string) => <Typography.Text>{text || '-'}</Typography.Text> },
-        { title: 'Planned Qty', dataIndex: 'quantity_planned', width: '12%', align: 'right' as const, render: (_: any, record: EditableLine) => (
-            <InputNumber min={1} value={record.quantity_planned} onChange={(value) => handleLineChange(record.key, 'quantity_planned', value)} style={{ width: '100%' }} />
+        { title: 'Expected Qty', dataIndex: 'expected_qty', width: '12%', align: 'right' as const, render: (_: any, record: EditableLine) => (
+            <InputNumber min={1} value={record.expected_qty} onChange={(value) => handleLineChange(record.key, 'expected_qty', value)} style={{ width: '100%' }} />
         )},
         { title: 'To Location', dataIndex: 'location_id', width: '15%', render: (_: any, record: EditableLine) => (
-            <Select allowClear value={record.location_id} placeholder="Select Location" options={locations.map(l => ({ label: l.code, value: l.id }))} onChange={(value) => handleLineChange(record.key, 'location_id', value)} style={{ width: '100%' }} />
+            <Select allowClear value={record.location_id} placeholder="Select Location" options={locations.map(l => ({ label: l.name, value: l.id }))} onChange={(value) => handleLineChange(record.key, 'location_id', value)} style={{ width: '100%' }} />
         )},
         { title: 'Tracking Info', key: 'tracking_info', width: '25%', render: (_: any, record: EditableLine) => {
             if (record.tracking_type === 'LOT') {
                 return <Space.Compact style={{width: '100%'}}>
                     <Input placeholder="Lot Number" value={record.lot_number || ''} onChange={(e) => handleLineChange(record.key, 'lot_number', e.target.value)} />
-                    <DatePicker placeholder="Expiry" value={record.expiry_date ? dayjs(record.expiry_date) : null} onChange={(date) => handleLineChange(record.key, 'expiry_date', date ? date.toString() : null)} />
+                    <DatePicker placeholder="Expiry" value={record.expiry_date ? dayjs(record.expiry_date) : null} onChange={(date) => handleLineChange(record.key, 'expiry_date', date)} />
                 </Space.Compact>
             }
             if (record.tracking_type === 'SERIAL') {
@@ -363,16 +358,9 @@ const GRCreateEditPage: React.FC = () => {
                         <Col span={8}><Form.Item name="transaction_type" label="Transaction Type" rules={[{ required: true }]}><Select options={GR_TRANSACTION_TYPES.map(t => ({ label: t.replace(/_/g, ' '), value: t }))} /></Form.Item></Col>
                         <Col span={8}><Form.Item name="warehouse_id" label="Warehouse" rules={[{ required: true }]}><Select showSearch filterOption placeholder="Select warehouse" options={warehouses.map(w => ({ label: w.name, value: w.id }))} /></Form.Item></Col>
                         <Col span={8}><Form.Item name="receipt_date" label="Receipt Date"><DatePicker style={{ width: '100%' }} /></Form.Item></Col>
-                        
-                        {['PURCHASE', 'RETURN_FROM_CUSTOMER'].includes(transactionType) &&
-                          <Col span={8}><Form.Item name="partner_id" label="Partner" rules={[{required: true}]}><AutoComplete options={partnerOptions} placeholder="Search partner..." filterOption={(inputValue, option) => option!.label.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1} /></Form.Item></Col>
-                        }
-                        {transactionType === 'TRANSFER_IN' &&
-                          <Col span={8}><Form.Item name="warehouse_from_id" label="From Warehouse" rules={[{required: true}]}><Select showSearch filterOption placeholder="Select source warehouse" options={warehouses.filter(w => w.id !== selectedWarehouseId).map(w => ({ label: w.name, value: w.id }))} /></Form.Item></Col>
-                        }
-                        
+                        <Col span={8}><Form.Item name="supplier_id" label="Supplier/Partner"><AutoComplete options={partnerOptions} onSelect={(value, option) => form.setFieldsValue({ partner_name: option.label })} placeholder="Search partner..." filterOption={(inputValue, option) => option!.label.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1} /></Form.Item></Col>
                         <Col span={8}><Form.Item name="partner_reference" label="Partner Reference"><Input placeholder="e.g., Invoice #, PO #" /></Form.Item></Col>
-                        <Col span={8}><Form.Item name="reference_number" label="Internal Reference"><Input placeholder="Auto-generated if empty" /></Form.Item></Col>
+                        <Col span={8}><Form.Item name="reference_number" label="Internal Reference"><Input placeholder="Internal reference number" /></Form.Item></Col>
                         <Col span={24}><Form.Item name="notes" label="Notes"><Input.TextArea rows={2} /></Form.Item></Col>
                     </Row>
                 </Card>
@@ -391,7 +379,9 @@ const GRCreateEditPage: React.FC = () => {
     );
 };
 
-const GRCreatePageWrapper: React.FC = () => {
+const GRCreatePage: React.FC = () => {
+    // The key prop is important to re-initialize the component when the URL changes 
+    // (e.g., from create to edit mode, or editing different items)
     const { id } = useParams<{ id: string }>(); 
     return (
         <App>
@@ -400,4 +390,4 @@ const GRCreatePageWrapper: React.FC = () => {
     );
 };
 
-export default GRCreatePageWrapper;
+export default GRCreatePage;

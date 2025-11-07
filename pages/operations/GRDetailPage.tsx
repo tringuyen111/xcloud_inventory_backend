@@ -42,7 +42,7 @@ const GRDetailPageContent: React.FC = () => {
                 .from('goods_receipts')
                 .select(`
                     *,
-                    warehouse:warehouses(name),
+                    warehouse:warehouses!warehouse_id(name),
                     gr_lines(*, goods_model:goods_models(name, code, base_uom:uoms(name)))
                 `)
                 .eq('id', id)
