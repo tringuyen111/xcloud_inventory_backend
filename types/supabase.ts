@@ -1,5 +1,6 @@
 
 
+
 export type Json =
   | string
   | number
@@ -153,9 +154,9 @@ export interface Database {
           receipt_date: string | null
           partner_reference: string | null
           warehouse_id: number
-          status: Database["public"]["Enums"]["gr_status"]
+          status: Database["public"]["Enums"]["gr_status_enum"]
           notes: string | null
-          transaction_type: Database["public"]["Enums"]["gr_transaction_type"]
+          transaction_type: Database["public"]["Enums"]["gr_transaction_type_enum"]
           partner_name: string | null
           supplier_id: number | null
           completed_at: string | null
@@ -171,9 +172,9 @@ export interface Database {
           receipt_date?: string | null
           partner_reference?: string | null
           warehouse_id: number
-          status: Database["public"]["Enums"]["gr_status"]
+          status: Database["public"]["Enums"]["gr_status_enum"]
           notes?: string | null
-          transaction_type: Database["public"]["Enums"]["gr_transaction_type"]
+          transaction_type: Database["public"]["Enums"]["gr_transaction_type_enum"]
           partner_name?: string | null
           supplier_id?: number | null
           completed_at?: string | null
@@ -189,9 +190,9 @@ export interface Database {
           receipt_date?: string | null
           partner_reference?: string | null
           warehouse_id?: number
-          status?: Database["public"]["Enums"]["gr_status"]
+          status?: Database["public"]["Enums"]["gr_status_enum"]
           notes?: string | null
-          transaction_type?: Database["public"]["Enums"]["gr_transaction_type"]
+          transaction_type?: Database["public"]["Enums"]["gr_transaction_type_enum"]
           partner_name?: string | null
           supplier_id?: number | null
           completed_at?: string | null
@@ -267,6 +268,95 @@ export interface Database {
           },
           {
             foreignKeyName: "gr_lines_location_id_fkey"
+            columns: ["location_id"]
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      goods_issues: {
+        Row: {
+          id: number;
+          created_at: string;
+          created_by: string | null;
+          updated_at: string | null;
+          updated_by: string | null;
+          reference_number: string | null;
+          issue_date: string | null;
+          warehouse_id: number;
+          to_warehouse_id: number | null;
+          partner_name: string | null;
+          delivery_address: string | null;
+          issue_mode: Database["public"]["Enums"]["issue_mode_enum"];
+          status: Database["public"]["Enums"]["gi_status_enum"];
+          transaction_type: Database["public"]["Enums"]["gi_transaction_type_enum"];
+          notes: string | null;
+        }
+        Insert: {
+          id?: number;
+          created_at?: string;
+          created_by?: string | null;
+          warehouse_id: number;
+          status: Database["public"]["Enums"]["gi_status_enum"];
+          transaction_type: Database["public"]["Enums"]["gi_transaction_type_enum"];
+          issue_mode: Database["public"]["Enums"]["issue_mode_enum"];
+          partner_name?: string | null;
+        }
+        Update: {
+          id?: number;
+        }
+        Relationships: [
+           {
+            foreignKeyName: "goods_issues_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_issues_to_warehouse_id_fkey"
+            columns: ["to_warehouse_id"]
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      gi_lines: {
+        Row: {
+          id: number;
+          created_at: string;
+          gi_id: number;
+          goods_model_id: number;
+          required_qty: number;
+          allocated_qty: number;
+          picked_qty: number;
+          location_id: number | null;
+          lot_number: string | null;
+          serial_number: string | null;
+        }
+        Insert: {
+           id?: number;
+           gi_id: number;
+           goods_model_id: number;
+           required_qty: number;
+        }
+        Update: {
+           id?: number;
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gi_lines_gi_id_fkey"
+            columns: ["gi_id"]
+            referencedRelation: "goods_issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gi_lines_goods_model_id_fkey"
+            columns: ["goods_model_id"]
+            referencedRelation: "goods_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gi_lines_location_id_fkey"
             columns: ["location_id"]
             referencedRelation: "locations"
             referencedColumns: ["id"]
@@ -630,8 +720,11 @@ export interface Database {
       }
     }
     Enums: {
-      gr_status: "DRAFT" | "CREATED" | "RECEIVING" | "PARTIAL_RECEIVED" | "APPROVED" | "COMPLETED"
-      gr_transaction_type: "PURCHASE" | "PRODUCTION" | "RETURN_FROM_CUSTOMER" | "TRANSFER_IN" | "ADJUSTMENT_IN"
+      gr_status_enum: "DRAFT" | "CREATED" | "RECEIVING" | "PARTIAL_RECEIVED" | "APPROVED" | "COMPLETED"
+      gi_status_enum: "DRAFT" | "CREATED" | "PICKING" | "PICKED" | "COMPLETED" | "CANCELLED"
+      gi_transaction_type_enum: "SALE" | "TRANSFER_OUT" | "ADJUSTMENT_OUT" | "RETURN_TO_SUPPLIER"
+      gr_transaction_type_enum: "PURCHASE" | "PRODUCTION" | "RETURN_FROM_CUSTOMER" | "TRANSFER_IN" | "ADJUSTMENT_IN"
+      issue_mode_enum: "DETAIL" | "SUMMARY"
       location_constraint_type: "NONE" | "ALLOWED" | "DISALLOWED"
       partner_type: "CUSTOMER" | "SUPPLIER" | "CARRIER" | "OTHER"
       tracking_type_enum: "NONE" | "LOT" | "SERIAL"
@@ -654,3 +747,5 @@ export type GoodsType = Database['public']['Tables']['goods_types']['Row'];
 export type GoodsModel = Database['public']['Tables']['goods_models']['Row'];
 export type GoodsReceipt = Database['public']['Tables']['goods_receipts']['Row'];
 export type GRLine = Database['public']['Tables']['gr_lines']['Row'];
+export type GoodsIssue = Database['public']['Tables']['goods_issues']['Row'];
+export type GILine = Database['public']['Tables']['gi_lines']['Row'];

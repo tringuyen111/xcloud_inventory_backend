@@ -16,7 +16,9 @@ import OnhandPage from './pages/onhand/OnhandPage';
 import GRListPage from './pages/operations/GoodsReceipts/GRListPage';
 import GRCreatePage from './pages/operations/GoodsReceipts/GRCreatePage';
 import GRViewPage from './pages/operations/GoodsReceipts/GRViewPage';
-import GIPage from './pages/operations/GIPage';
+import GIListPage from './pages/operations/GIPage';
+import GICreatePage from './pages/operations/GoodsIssues/GICreatePage';
+import GIViewPage from './pages/operations/GoodsIssues/GIViewPage';
 import ICPage from './pages/operations/ICPage';
 import GTPage from './pages/operations/GTPage';
 import PAPage from './pages/operations/PAPage';
@@ -36,7 +38,7 @@ import LocationsListPage from './pages/master-data/Locations/LocationsListPage';
 import LocationDetailPage from './pages/master-data/Locations/LocationDetailPage';
 import UomCategoriesListPage from './pages/master-data/UOMCategories/UomCategoriesListPage';
 import UomCategoryDetailPage from './pages/master-data/UOMCategories/UomCategoryDetailPage';
-import UomsListPage from './pages/master/UomsListPage';
+import UomsListPage from './pages/master-data/UOMs/UomsListPage';
 import UomDetailPage from './pages/master-data/UOMs/UomDetailPage';
 import PartnersListPage from './pages/master-data/Partners/PartnersListPage';
 import PartnerDetailPage from './pages/master-data/Partners/PartnerDetailPage';
@@ -97,7 +99,10 @@ const App: React.FC = () => {
                                 <Route path="/operations/gr/create" element={<GRCreatePage />} />
                                 <Route path="/operations/gr/:id" element={<GRViewPage />} />
                                 <Route path="/operations/gr/:id/edit" element={<GRCreatePage />} />
-                                <Route path="/operations/gi" element={<GIPage />} />
+                                <Route path="/operations/gi" element={<GIListPage />} />
+                                <Route path="/operations/gi/create" element={<GICreatePage />} />
+                                <Route path="/operations/gi/:id" element={<GIViewPage />} />
+                                <Route path="/operations/gi/:id/edit" element={<GICreatePage />} />
                                 <Route path="/operations/ic" element={<ICPage />} />
                                 <Route path="/operations/gt" element={<GTPage />} />
                                 <Route path="/operations/pa" element={<PAPage />} />
