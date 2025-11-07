@@ -203,9 +203,7 @@ const WarehousesListPage: React.FC = () => {
     const getColumns = () => {
         const actionMenu = (record: Warehouse) => (
             <Menu>
-                {/* FIX: Corrected navigation path from /master/ to /master-data/ */}
                 <Menu.Item key="1" icon={<EyeOutlined />} onClick={() => navigate(`/master-data/warehouses/${record.id}`)}>View</Menu.Item>
-                {/* FIX: Corrected navigation path from /master/ to /master-data/ */}
                 <Menu.Item key="2" icon={<EditOutlined />} onClick={() => navigate(`/master-data/warehouses/${record.id}`)}>Edit</Menu.Item>
                 <Menu.Divider />
                 <Menu.Item key="3" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)}>Delete</Menu.Item>
@@ -260,7 +258,6 @@ const WarehousesListPage: React.FC = () => {
                 loading={loading}
                 pagination={{...pagination, showSizeChanger: true, pageSizeOptions: ['10', '20', '50', '100'], showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`}}
                 onChange={handleTableChange}
-                // FIX: Corrected navigation path from /master/ to /master-data/
                 onRow={(record) => ({ onDoubleClick: () => navigate(`/master-data/warehouses/${record.id}`)})}
             />
             

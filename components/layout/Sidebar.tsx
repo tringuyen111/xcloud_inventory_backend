@@ -1,4 +1,6 @@
+
 import React, { useState } from 'react';
+// FIX: Corrected react-router-dom import.
 import { NavLink, useLocation } from 'react-router-dom';
 import useUIStore from '../../stores/uiStore';
 

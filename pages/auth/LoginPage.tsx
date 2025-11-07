@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { supabase } from '../../services/supabaseClient';
-import { Form, Input, Button, Alert, Typography, Card } from 'antd';
+// FIX: Aliased Card import to avoid potential name collisions.
+import { Form, Input, Button, Alert, Typography, Card as AntdCard } from 'antd';
 import { MailOutlined, LockOutlined } from '@ant-design/icons';
 
 const LoginPage: React.FC = () => {
@@ -25,7 +27,7 @@ const LoginPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-[#f5f7fb] flex items-center justify-center">
-            <Card className="w-full max-w-md shadow-lg">
+            <AntdCard className="w-full max-w-md shadow-lg">
                 <div className="text-center mb-8">
                     <Typography.Title level={2} className="text-gray-800">Inventory XCloud</Typography.Title>
                     <Typography.Text type="secondary">Sign in to your account</Typography.Text>
@@ -59,7 +61,7 @@ const LoginPage: React.FC = () => {
                         </Button>
                     </Form.Item>
                 </Form>
-            </Card>
+            </AntdCard>
         </div>
     );
 };

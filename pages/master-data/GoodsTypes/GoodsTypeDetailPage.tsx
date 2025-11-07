@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../services/supabaseClient';
@@ -13,7 +14,7 @@ import PageHeader from '../../../components/layout/PageHeader';
 const GoodsTypeDetailPageContent: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<GoodsType>();
   const { notification } = App.useApp();
 
   const [loading, setLoading] = useState(true);

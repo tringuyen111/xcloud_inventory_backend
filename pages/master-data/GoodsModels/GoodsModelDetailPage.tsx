@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../services/supabaseClient';
 import { GoodsModel, GoodsType, Uom } from '../../../types/supabase';
 import {
-  Button, Card, Form, Input, Row, Col, Space, App, Spin, Select, Descriptions, Tag, Alert, Upload, Carousel, Image
+  Button, Card, Form, Input, Row, Col, Space, App, Spin, Select, Descriptions, Tag, Alert, Upload, Carousel, Image as AntdImage
 } from 'antd';
 import { EditOutlined, UploadOutlined, DeleteOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { format } from 'date-fns';
@@ -21,7 +22,7 @@ type GoodsModelWithDetails = GoodsModel & {
 const GoodsModelDetailPageContent: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const [form] = Form.useForm();
+    const [form] = Form.useForm<any>();
     const { notification, modal } = App.useApp();
 
     const [loading, setLoading] = useState(true);
@@ -223,15 +224,15 @@ const GoodsModelDetailPageContent: React.FC = () => {
                 <Col xs={24} lg={10}>
                      <Card title="Product Images">
                         {fileList.length > 0 ? (
-                             <Image.PreviewGroup>
+                             <AntdImage.PreviewGroup>
                                 <Carousel ref={carouselRef} afterChange={setActiveSlide} arrows prevArrow={<LeftOutlined />} nextArrow={<RightOutlined />}>
                                     {fileList.map(file => (
                                         <div key={file.uid} className="flex justify-center items-center bg-gray-100 h-80">
-                                            <Image src={file.url} alt={file.name} className="max-h-full max-w-full object-contain" />
+                                            <AntdImage src={file.url} alt={file.name} className="max-h-full max-w-full object-contain" />
                                         </div>
                                     ))}
                                 </Carousel>
-                             </Image.PreviewGroup>
+                             </AntdImage.PreviewGroup>
                         ) : (
                             <div className="flex justify-center items-center bg-gray-100 h-80 text-gray-400">No images</div>
                         )}

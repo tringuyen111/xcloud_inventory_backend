@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../services/supabaseClient';
@@ -15,7 +16,7 @@ type BranchWithOrg = Branch & { organization?: { name: string } };
 const BranchDetailPageContent: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<Branch>();
   const { notification } = App.useApp();
 
   const [loading, setLoading] = useState(true);

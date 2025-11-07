@@ -54,6 +54,9 @@ type EditableLine = {
     location_id?: number | null;
     expected_qty?: number;
     actual_qty?: number | null;
+    lot_number?: string | null;
+    serial_number?: string | null;
+    expiry_date?: string | null;
     uom_name?: string;
     tracking_type?: 'NONE' | 'LOT' | 'SERIAL';
 };
@@ -63,13 +66,15 @@ const GR_TRANSACTION_TYPES: GRTransactionType[] = [
 ];
 
 // --- Main Component ---
-const GRCreateEditPage: React.FC<{ isEditMode?: boolean }> = ({ isEditMode = false }) => {
+const GRCreateEditPage: React.FC = () => {
     const navigate = useNavigate();
     const { id: grId } = useParams<{ id: string }>();
     const [form] = Form.useForm();
     const { notification } = App.useApp();
     const user = useAuthStore((state) => state.user);
     const selectedWarehouseId = Form.useWatch('warehouse_id', form);
+    
+    const isEditMode = !!grId;
 
     // --- State Management ---
     const [loading, setLoading] = useState(true);
@@ -122,9 +127,10 @@ const GRCreateEditPage: React.FC<{ isEditMode?: boolean }> = ({ isEditMode = fal
                 const model = currentGoodsModels.find(m => m.id === line.goods_model_id);
                 return {
                     ...line,
-                    key: -(index + 1),
+                    key: -(index + 1), // Use negative keys for existing items
                     uom_name: model?.base_uom?.name || '',
                     tracking_type: model?.tracking_type,
+                    expiry_date: line.expiry_date ? dayjs(line.expiry_date) : null
                 };
             });
             setLines(loadedLines);
@@ -174,7 +180,7 @@ const GRCreateEditPage: React.FC<{ isEditMode?: boolean }> = ({ isEditMode = fal
 
     const handleLineChange = (key: number, field: keyof EditableLine, value: any) => {
         if (field === 'goods_model_id' && value && lines.some(line => line.goods_model_id === value && line.key !== key)) {
-            notification.error({ message: "Model already added. Please edit the existing line." });
+            notification.warning({ message: "Model already added. Please edit the existing line." });
             return;
         }
         setLines(currentLines => currentLines.map(line => {
@@ -219,6 +225,9 @@ const GRCreateEditPage: React.FC<{ isEditMode?: boolean }> = ({ isEditMode = fal
                     location_id: l.location_id || null,
                     expected_qty: l.expected_qty!,
                     actual_qty: l.actual_qty ?? 0,
+                    lot_number: l.lot_number || null,
+                    serial_number: l.serial_number || null,
+                    expiry_date: l.expiry_date ? dayjs(l.expiry_date).format('YYYY-MM-DD') : null,
                 }));
             
             if (!isDraft && linesData.length === 0) {
@@ -226,7 +235,6 @@ const GRCreateEditPage: React.FC<{ isEditMode?: boolean }> = ({ isEditMode = fal
             }
     
             if (isEditMode) {
-                // --- EDIT MODE LOGIC ---
                 const headerPayload = {
                     ...headerValues,
                     status: form.getFieldValue('status') === 'DRAFT' ? status : form.getFieldValue('status'),
@@ -244,12 +252,8 @@ const GRCreateEditPage: React.FC<{ isEditMode?: boolean }> = ({ isEditMode = fal
     
                 if (linesData.length > 0) {
                     const linesToUpsert = linesData.map(l => ({ 
-                        id: l.id,
+                        ...l,
                         gr_id: gr.id,
-                        goods_model_id: l.goods_model_id,
-                        location_id: l.location_id,
-                        expected_qty: l.expected_qty,
-                        actual_qty: l.actual_qty
                     }));
                     const { error: linesError } = await supabase.from('gr_lines').upsert(linesToUpsert, { onConflict: 'id' });
                     if (linesError) throw linesError;
@@ -258,27 +262,17 @@ const GRCreateEditPage: React.FC<{ isEditMode?: boolean }> = ({ isEditMode = fal
                 navigate(`/operations/gr/${gr.id}`);
     
             } else {
-                // --- CREATE MODE LOGIC (RPC) ---
-                const linesForRpc = linesData.map(l => ({
-                    goods_model_id: l.goods_model_id,
-                    location_id: l.location_id,
-                    expected_qty: l.expected_qty
-                }));
-    
-                const rpcPayload = {
-                    p_warehouse_id: headerValues.warehouse_id,
-                    p_receipt_date: headerValues.receipt_date ? dayjs(headerValues.receipt_date).format('YYYY-MM-DD') : null,
-                    p_transaction_type: headerValues.transaction_type,
-                    p_status: status,
-                    p_partner_name: headerValues.partner_name || null,
-                    p_partner_reference: headerValues.partner_reference || null,
-                    p_notes: headerValues.notes || null,
-                    p_lines: linesForRpc
-                };
-    
                 const { data: new_gr_id, error: rpcError } = await supabase.rpc(
-                    'create_goods_receipt_with_lines', 
-                    rpcPayload
+                    'create_goods_receipt_with_lines', {
+                        p_warehouse_id: headerValues.warehouse_id,
+                        p_receipt_date: headerValues.receipt_date ? dayjs(headerValues.receipt_date).format('YYYY-MM-DD') : null,
+                        p_transaction_type: headerValues.transaction_type,
+                        p_status: status,
+                        p_partner_name: headerValues.partner_name || null,
+                        p_partner_reference: headerValues.partner_reference || null,
+                        p_notes: headerValues.notes || null,
+                        p_lines: linesData.map(({ id, ...rest }) => rest) // Exclude ID for new lines
+                    }
                 );
     
                 if (rpcError) throw rpcError;
@@ -288,50 +282,13 @@ const GRCreateEditPage: React.FC<{ isEditMode?: boolean }> = ({ isEditMode = fal
             }
     
         } catch (error: any) {
-            console.error("Submission Error Details:", error);
-
             let title = 'Submission Failed';
-            let description = 'An unexpected error occurred. Please check the console for details.';
-
-            // Case 1: Ant Design Form Validation Error
-            if (error && Array.isArray(error.errorFields) && error.errorFields.length > 0) {
+            let description = error.message || 'An unexpected error occurred.';
+            if (error.errorFields) { // Ant validation error
                 title = 'Validation Error';
-                description = `Please correct the following fields: ${error.errorFields.map((ef: any) => ef.name.join('.')).join(', ')}`;
-            } 
-            // Case 2: Supabase PostgrestError or similar object with a 'message' property
-            else if (error && typeof error.message === 'string') {
-                title = 'Database Error';
-                description = error.message;
-                if (typeof error.details === 'string' && error.details) {
-                    description += `\n\nDetails: ${error.details}`;
-                }
-                if (typeof error.hint === 'string' && error.hint) {
-                    description += `\n\nHint: ${error.hint}`;
-                }
+                description = 'Please correct the highlighted fields.';
             }
-            // Case 3: A generic Error object
-            else if (error instanceof Error) {
-                title = 'Application Error';
-                description = error.toString();
-            }
-            // Case 4: Fallback for other object types
-            else if (typeof error === 'object' && error !== null) {
-                try {
-                    description = `An error object was received: ${JSON.stringify(error)}`;
-                } catch {
-                    description = 'An un-serializable error object was received. Please check the developer console.';
-                }
-            }
-            // Case 5: Fallback for non-object errors (e.g., string)
-            else if (error) {
-                description = `An error occurred: ${String(error)}`;
-            }
-            
-            notification.error({
-                message: title,
-                description: <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{description}</pre>,
-                duration: 15 // Longer duration for complex errors
-            });
+            notification.error({ message: title, description: <pre style={{ whiteSpace: 'pre-wrap' }}>{description}</pre>, duration: 10 });
         } finally {
             setIsSaving(false);
         }
@@ -344,27 +301,41 @@ const GRCreateEditPage: React.FC<{ isEditMode?: boolean }> = ({ isEditMode = fal
     
     const partnerOptions = useMemo(() => partners.map(p => ({ label: p.name, value: p.name })), [partners]);
 
-    const lineColumns = [
-        { title: 'Goods Model', dataIndex: 'goods_model_id', width: '35%', render: (_: any, record: EditableLine) => (
+    const lineColumns: any[] = [
+        { title: 'Goods Model', dataIndex: 'goods_model_id', width: '30%', render: (_: any, record: EditableLine) => (
             <Select showSearch allowClear value={record.goods_model_id} placeholder="Search by name or code..." options={goodsModelOptions} onChange={(value) => handleLineChange(record.key, 'goods_model_id', value)} filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())} style={{ width: '100%' }} />
         )},
-        { title: 'UoM', dataIndex: 'uom_name', width: '8%', render: (text: string) => <Typography.Text>{text || '-'}</Typography.Text> },
-        { title: 'Tracking', dataIndex: 'tracking_type', width: '10%', render: (type: string) => type ? <Tag>{type}</Tag> : '-' },
-        { title: 'Location', dataIndex: 'location_id', width: '22%', render: (_: any, record: EditableLine) => (
-            <Select allowClear value={record.location_id} placeholder={"N/A at creation"} options={locations.map(l => ({ label: l.name, value: l.id }))} onChange={(value) => handleLineChange(record.key, 'location_id', value)} style={{ width: '100%' }} disabled={false} />
+        { title: 'UoM', dataIndex: 'uom_name', width: '7%', render: (text: string) => <Typography.Text>{text || '-'}</Typography.Text> },
+        { title: 'Tracking', dataIndex: 'tracking_type', width: '8%', render: (type: string) => type ? <Tag>{type}</Tag> : '-' },
+        { title: 'Location', dataIndex: 'location_id', width: '15%', render: (_: any, record: EditableLine) => (
+            <Select allowClear value={record.location_id} placeholder="Select Location" options={locations.map(l => ({ label: l.name, value: l.id }))} onChange={(value) => handleLineChange(record.key, 'location_id', value)} style={{ width: '100%' }} />
         )},
-        { title: 'Expected Qty', dataIndex: 'expected_qty', width: '15%', align: 'right' as const, render: (_: any, record: EditableLine) => (
+        { title: 'Expected Qty', dataIndex: 'expected_qty', width: '10%', align: 'right' as const, render: (_: any, record: EditableLine) => (
             <InputNumber min={1} value={record.expected_qty} onChange={(value) => handleLineChange(record.key, 'expected_qty', value)} style={{ width: '100%' }} />
         )},
-        { title: 'Action', key: 'action', width: '10%', align: 'center' as const, render: (_: any, record: EditableLine) => (
+        ...(isEditMode ? [{ 
+            title: 'Actual Qty', dataIndex: 'actual_qty', width: '10%', align: 'right' as const, render: (_: any, record: EditableLine) => (
+                <InputNumber min={0} value={record.actual_qty} onChange={(value) => handleLineChange(record.key, 'actual_qty', value)} style={{ width: '100%' }} />
+        )}] : []),
+        { title: 'Tracking Info', key: 'tracking_info', width: '20%', render: (_: any, record: EditableLine) => {
+            if (record.tracking_type === 'LOT') {
+                return <Space.Compact style={{width: '100%'}}>
+                    <Input placeholder="Lot Number" value={record.lot_number || ''} onChange={(e) => handleLineChange(record.key, 'lot_number', e.target.value)} />
+                    <DatePicker placeholder="Expiry" value={record.expiry_date ? dayjs(record.expiry_date) : null} onChange={(date) => handleLineChange(record.key, 'expiry_date', date)} />
+                </Space.Compact>
+            }
+            if (record.tracking_type === 'SERIAL') {
+                return <Input placeholder="Serial Number" value={record.serial_number || ''} onChange={(e) => handleLineChange(record.key, 'serial_number', e.target.value)} />
+            }
+            return <Typography.Text type="secondary">-</Typography.Text>;
+        }},
+        { title: 'Action', key: 'action', width: '5%', align: 'center' as const, render: (_: any, record: EditableLine) => (
             <Popconfirm title="Sure to delete?" onConfirm={() => handleRemoveLine(record.key)}>
                 <Button icon={<DeleteOutlined />} danger type="text" />
             </Popconfirm>
         )},
     ];
 
-
-    // --- Render ---
     if (loading) return <Spin fullscreen />;
     const title = isEditMode ? `Edit Goods Receipt (GR-${grId})` : "Create Goods Receipt";
     const description = isEditMode ? "Update details for this goods receipt." : "Create a new goods receipt for incoming inventory.";
@@ -378,22 +349,20 @@ const GRCreateEditPage: React.FC<{ isEditMode?: boolean }> = ({ isEditMode = fal
                         <Col span={8}><Form.Item name="transaction_type" label="Transaction Type" rules={[{ required: true }]}><Select options={GR_TRANSACTION_TYPES.map(t => ({ label: t.replace(/_/g, ' '), value: t }))} /></Form.Item></Col>
                         <Col span={8}><Form.Item name="warehouse_id" label="Warehouse" rules={[{ required: true }]}><Select showSearch filterOption placeholder="Select warehouse" options={warehouses.map(w => ({ label: w.name, value: w.id }))} /></Form.Item></Col>
                         <Col span={8}><Form.Item name="receipt_date" label="Expected Receipt Date"><DatePicker style={{ width: '100%' }} /></Form.Item></Col>
-                    </Row>
-                    <Row gutter={16}>
                         <Col span={8}><Form.Item name="partner_name" label="Partner Name"><AutoComplete options={partnerOptions} style={{ width: '100%' }} placeholder="Select or enter partner name" filterOption={(inputValue, option) => option!.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1} /></Form.Item></Col>
                         <Col span={8}><Form.Item name="partner_reference" label="Partner Reference"><Input placeholder="e.g., PO-123, ASN-456" /></Form.Item></Col>
-                        <Col span={8}><Form.Item name="reference_number" label="Reference Number"><Input placeholder="Your internal reference" /></Form.Item></Col>
+                        <Col span={8}>{isEditMode && <Form.Item name="reference_number" label="Reference Number"><Input readOnly /></Form.Item>}</Col>
+                        <Col span={24}><Form.Item name="notes" label="Notes"><Input.TextArea rows={2} placeholder="Add any relevant notes here..." /></Form.Item></Col>
                     </Row>
-                     <Row><Col span={24}><Form.Item name="notes" label="Notes"><Input.TextArea rows={2} placeholder="Add any relevant notes here..." /></Form.Item></Col></Row>
                 </Card>
             </Form>
             <Card title="Line Items" extra={<Button icon={<PlusOutlined />} onClick={handleAddLine} type="dashed">Add Item</Button>}>
-                <Table dataSource={lines} columns={lineColumns} pagination={false} rowKey="key" size="small" />
+                <Table dataSource={lines} columns={lineColumns} pagination={false} rowKey="key" size="small" scroll={{ x: 1300 }} />
             </Card>
             <Row justify="end">
                 <Space>
                     <Button icon={<RollbackOutlined />} onClick={() => navigate('/operations/gr')} danger>Cancel</Button>
-                    <Button icon={<SaveOutlined />} onClick={() => handleSubmit(true)} loading={isSaving}>Save as Draft</Button>
+                    {form.getFieldValue('status') === 'DRAFT' && <Button icon={<SaveOutlined />} onClick={() => handleSubmit(true)} loading={isSaving}>Save as Draft</Button>}
                     <Button type="primary" icon={<CheckOutlined />} onClick={() => handleSubmit(false)} loading={isSaving}>{isEditMode ? 'Update' : 'Create'}</Button>
                 </Space>
             </Row>
@@ -401,11 +370,13 @@ const GRCreateEditPage: React.FC<{ isEditMode?: boolean }> = ({ isEditMode = fal
     );
 };
 
-// Wrapper to provide App context (notification, modal)
-const GRCreateWrapper: React.FC<{ isEditMode?: boolean }> = ({ isEditMode }) => (
-    <App>
-        <GRCreateEditPage isEditMode={isEditMode} />
-    </App>
-);
+const GRCreatePageWrapper: React.FC = () => {
+    const { id } = useParams<{ id: string }>();
+    return (
+        <App>
+            <GRCreateEditPage key={id} />
+        </App>
+    );
+};
 
-export default GRCreateWrapper;
+export default GRCreatePageWrapper;

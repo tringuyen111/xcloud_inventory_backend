@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../services/supabaseClient';
 import { Organization } from '../../../types/supabase';
@@ -9,7 +10,7 @@ import {
     PlusOutlined, ExportOutlined, ProfileOutlined, EllipsisOutlined, EyeOutlined, EditOutlined, DeleteOutlined, DownOutlined
 } from '@ant-design/icons';
 import useAuthStore from '../../../stores/authStore';
-import type { TableProps } from 'antd';
+import type { TableProps, FormInstance } from 'antd';
 import type { Dayjs } from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -34,7 +35,7 @@ const OrganizationsListPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const { notification, modal } = App.useApp();
     const navigate = useNavigate();
-    const [form] = Form.useForm();
+    const [form] = Form.useForm<any>();
     const user = useAuthStore((state) => state.user);
 
     const [isModalOpen, setIsModalOpen] = useState(false);

@@ -1,4 +1,7 @@
+
+
 import React from 'react';
+// FIX: Corrected react-router-dom import.
 import { HashRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { App as AntdApp, ConfigProvider, Spin } from 'antd';
 import AppLayout from './components/layout/AppLayout';
@@ -7,7 +10,7 @@ import useAuthStore from './stores/authStore';
 
 // Page imports
 import DashboardPage from './pages/dashboard/DashboardPage';
-import OnhandPage from './pages/operations/Onhand/OnhandListPage';
+import OnhandPage from './pages/onhand/OnhandPage';
 
 // Operations Pages
 import GRListPage from './pages/operations/GoodsReceipts/GRListPage';
@@ -33,7 +36,7 @@ import LocationsListPage from './pages/master-data/Locations/LocationsListPage';
 import LocationDetailPage from './pages/master-data/Locations/LocationDetailPage';
 import UomCategoriesListPage from './pages/master-data/UOMCategories/UomCategoriesListPage';
 import UomCategoryDetailPage from './pages/master-data/UOMCategories/UomCategoryDetailPage';
-import UomsListPage from './pages/master-data/UOMs/UomsListPage';
+import UomsListPage from './pages/master/UomsListPage';
 import UomDetailPage from './pages/master-data/UOMs/UomDetailPage';
 import PartnersListPage from './pages/master-data/Partners/PartnersListPage';
 import PartnerDetailPage from './pages/master-data/Partners/PartnerDetailPage';
