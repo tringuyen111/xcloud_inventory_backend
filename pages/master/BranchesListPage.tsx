@@ -2,17 +2,33 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../services/supabase';
 import { Branch, Organization } from '../../types/supabase';
 import {
-    Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Modal, Form, Dropdown, Menu, Typography
+    Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Modal, Form, Dropdown, Menu, Typography, DatePicker, Checkbox
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import {
-    PlusOutlined, ExportOutlined, ProfileOutlined, EllipsisOutlined, EyeOutlined, EditOutlined, DeleteOutlined
+    PlusOutlined, ExportOutlined, ProfileOutlined, EllipsisOutlined, EyeOutlined, EditOutlined, DeleteOutlined, DownOutlined
 } from '@ant-design/icons';
 import useAuthStore from '../../stores/authStore';
+import type { TableProps } from 'antd';
+import type { Dayjs } from 'dayjs';
 
 const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
 
 type BranchWithOrg = Branch & { organizations: { name: string } | null };
+
+const defaultColumns: TableProps<BranchWithOrg>['columns'] = [
+    { title: 'Code', dataIndex: 'code', key: 'code', sorter: (a, b) => a.code.localeCompare(b.code) },
+    { title: 'Name', dataIndex: 'name', key: 'name', sorter: (a, b) => a.name.localeCompare(b.name) },
+    { title: 'Organization', dataIndex: ['organizations', 'name'], key: 'organization', sorter: (a, b) => (a.organizations?.name || '').localeCompare(b.organizations?.name || '') },
+    { title: 'Status', dataIndex: 'is_active', key: 'is_active', render: (isActive: boolean) => <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'Active' : 'Inactive'}</Tag> },
+    {
+        title: 'Actions',
+        key: 'action',
+        align: 'center' as const,
+        render: () => <EllipsisOutlined />,
+    },
+];
 
 const BranchesListPage: React.FC = () => {
     const [branches, setBranches] = useState<BranchWithOrg[]>([]);
@@ -27,22 +43,35 @@ const BranchesListPage: React.FC = () => {
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [orgFilter, setOrgFilter] = useState<number | null>(null);
+    const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
+    const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
+    
+    const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns.map(c => c.key as string));
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (page: number, pageSize: number) => {
         setLoading(true);
         try {
-            let query = supabase.from('branches').select('*, organizations(name)');
+            let query = supabase.from('branches').select('*, organizations(name)', { count: 'exact' });
             if (searchTerm) query = query.or(`name.ilike.%${searchTerm}%,code.ilike.%${searchTerm}%`);
             if (statusFilter !== 'all') query = query.eq('is_active', statusFilter === 'active');
-            const { data, error } = await query.order('name', { ascending: true });
+            if (orgFilter) query = query.eq('org_id', orgFilter);
+            if (dateRange && dateRange[0]) query = query.gte('updated_at', dateRange[0].startOf('day').toISOString());
+            if (dateRange && dateRange[1]) query = query.lte('updated_at', dateRange[1].endOf('day').toISOString());
+            
+            const { data, error, count } = await query
+                .order('name', { ascending: true })
+                .range((page - 1) * pageSize, page * pageSize - 1);
+
             if (error) throw error;
             setBranches(data as BranchWithOrg[] || []);
+            setPagination(prev => ({...prev, total: count || 0 }));
         } catch (error: any) {
             notification.error({ message: "Error fetching branches", description: error.message });
         } finally {
             setLoading(false);
         }
-    }, [notification, searchTerm, statusFilter]);
+    }, [notification, searchTerm, statusFilter, orgFilter, dateRange]);
 
     const fetchOrganizations = useCallback(async () => {
         try {
@@ -55,9 +84,16 @@ const BranchesListPage: React.FC = () => {
     }, [notification]);
 
     useEffect(() => {
-        fetchData();
+        fetchData(pagination.current, pagination.pageSize);
+    }, [fetchData, pagination.current, pagination.pageSize]);
+
+    useEffect(() => {
         fetchOrganizations();
-    }, [fetchData, fetchOrganizations]);
+    }, [fetchOrganizations]);
+    
+    const handleTableChange = (paginationConfig: any) => {
+        setPagination(prev => ({ ...prev, ...paginationConfig }));
+    };
 
     const handleCreate = () => {
         form.resetFields();
@@ -74,7 +110,8 @@ const BranchesListPage: React.FC = () => {
             if (error) throw error;
             notification.success({ message: "Branch created successfully" });
             setIsModalOpen(false);
-            fetchData();
+            fetchData(1, pagination.pageSize);
+            setPagination(p => ({...p, current: 1}));
         } catch (error: any) {
             notification.error({ message: "Failed to create branch", description: error.message });
         } finally {
@@ -93,7 +130,7 @@ const BranchesListPage: React.FC = () => {
                     const { error } = await supabase.from('branches').delete().eq('id', id);
                     if (error) throw error;
                     notification.success({ message: 'Branch deleted successfully' });
-                    fetchData();
+                    fetchData(pagination.current, pagination.pageSize);
                 } catch (error: any) {
                     notification.error({ message: 'Failed to delete', description: error.message });
                 }
@@ -101,31 +138,85 @@ const BranchesListPage: React.FC = () => {
         });
     };
 
-    const actionMenu = (record: Branch) => (
+    const exportToCsv = (filename: string, data: BranchWithOrg[]) => {
+        const visibleCols = defaultColumns.filter(c => visibleColumns.includes(c.key as string) && c.key !== 'action');
+        const header = visibleCols.map(c => c.title).join(',');
+        const rows = data.map(row => 
+            visibleCols.map(col => {
+                let value;
+                if (Array.isArray(col.dataIndex)) {
+                    value = col.dataIndex.reduce((obj, key) => (obj && obj[key] !== 'undefined') ? obj[key] : '', row);
+                } else {
+                    value = row[col.dataIndex as keyof BranchWithOrg];
+                }
+                if (value === null || value === undefined) return '';
+                if (typeof value === 'boolean') return value ? 'Active' : 'Inactive';
+                return `"${String(value).replace(/"/g, '""')}"`;
+            }).join(',')
+        );
+        const csv = [header, ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+    
+    const columnsMenu = (
         <Menu>
-            <Menu.Item key="1" icon={<EyeOutlined />} onClick={() => navigate(`/master/branches/${record.id}`)}>View</Menu.Item>
-            <Menu.Item key="2" icon={<EditOutlined />} onClick={() => navigate(`/master/branches/${record.id}`)}>Edit</Menu.Item>
-            <Menu.Divider />
-            <Menu.Item key="3" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)}>Delete</Menu.Item>
+            {defaultColumns
+                .filter(c => c.key !== 'action')
+                .map(col => {
+                    const key = col.key as string;
+                    return (
+                        <Menu.Item key={key} onClick={(e) => e.domEvent.stopPropagation()}>
+                            <Checkbox
+                                checked={visibleColumns.includes(key)}
+                                onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    if (checked) {
+                                        setVisibleColumns(prev => [...prev, key]);
+                                    } else {
+                                        if (visibleColumns.filter(k => k !== 'action').length > 1) {
+                                            setVisibleColumns(prev => prev.filter(k => k !== key));
+                                        } else {
+                                            notification.warning({ message: "At least one column must be visible."});
+                                        }
+                                    }
+                                }}
+                            >
+                                {col.title as string}
+                            </Checkbox>
+                        </Menu.Item>
+                    )
+                })
+            }
         </Menu>
     );
 
-    const columns = [
-        { title: 'Code', dataIndex: 'code', key: 'code', sorter: (a: Branch, b: Branch) => a.code.localeCompare(b.code) },
-        { title: 'Name', dataIndex: 'name', key: 'name', sorter: (a: Branch, b: Branch) => a.name.localeCompare(b.name) },
-        { title: 'Organization', dataIndex: 'organizations', key: 'organization', render: (org: { name: string } | null) => org?.name || '-', sorter: (a: BranchWithOrg, b: BranchWithOrg) => (a.organizations?.name || '').localeCompare(b.organizations?.name || '') },
-        { title: 'Status', dataIndex: 'is_active', key: 'is_active', render: (isActive: boolean) => <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'Active' : 'Inactive'}</Tag> },
-        {
-            title: 'Actions',
-            key: 'action',
-            align: 'center' as const,
-            render: (_: any, record: Branch) => (
+    const getColumns = () => {
+        const actionMenu = (record: Branch) => (
+            <Menu>
+                <Menu.Item key="1" icon={<EyeOutlined />} onClick={() => navigate(`/master/branches/${record.id}`)}>View</Menu.Item>
+                <Menu.Item key="2" icon={<EditOutlined />} onClick={() => navigate(`/master/branches/${record.id}`)}>Edit</Menu.Item>
+                <Menu.Divider />
+                <Menu.Item key="3" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)}>Delete</Menu.Item>
+            </Menu>
+        );
+
+        const cols = [...defaultColumns];
+        const actionCol = cols.find(c => c.key === 'action');
+        if (actionCol) {
+            actionCol.render = (_: any, record: Branch) => (
                  <Dropdown overlay={actionMenu(record)} trigger={['click']}>
                     <Button type="text" icon={<EllipsisOutlined />} />
                 </Dropdown>
-            ),
-        },
-    ];
+            );
+        }
+        return cols.filter(c => visibleColumns.includes(c.key as string));
+    };
 
     return (
         <Card>
@@ -136,26 +227,33 @@ const BranchesListPage: React.FC = () => {
                 </Col>
                 <Col>
                     <Space>
-                        <Button icon={<ExportOutlined />} onClick={() => notification.info({message: 'Export function is not yet implemented.'})}>Export</Button>
-                        <Button icon={<ProfileOutlined />} onClick={() => notification.info({message: 'Column customization is not yet implemented.'})}>Columns</Button>
+                        <Button icon={<ExportOutlined />} onClick={() => exportToCsv('branches.csv', branches)}>Export</Button>
+                        <Dropdown overlay={columnsMenu} trigger={['click']}>
+                            <Button icon={<ProfileOutlined />}>
+                                Columns <DownOutlined />
+                            </Button>
+                        </Dropdown>
                         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>Add New</Button>
                     </Space>
                 </Col>
             </Row>
 
             <div className="p-4 mb-6 bg-gray-50 rounded-lg">
-                 <Row gutter={16} align="bottom">
-                    <Col><Form.Item label="Search" style={{ marginBottom: 0 }}><Input.Search placeholder="Search by name or code..." onSearch={setSearchTerm} allowClear style={{width: 250}} /></Form.Item></Col>
-                    <Col><Form.Item label="Status" style={{ marginBottom: 0 }}><Select value={statusFilter} onChange={setStatusFilter} style={{ width: 120 }}><Select.Option value="all">All</Select.Option><Select.Option value="active">Active</Select.Option><Select.Option value="inactive">Inactive</Select.Option></Select></Form.Item></Col>
+                 <Row gutter={[16, 16]} align="bottom">
+                    <Col><Form.Item label="Search" style={{ marginBottom: 0 }}><Input.Search placeholder="Search by name or code..." onSearch={(val) => {setSearchTerm(val); setPagination(p => ({...p, current: 1}));}} allowClear style={{width: 250}} /></Form.Item></Col>
+                    <Col><Form.Item label="Organization" style={{ marginBottom: 0 }}><Select allowClear placeholder="All Organizations" value={orgFilter} onChange={(val) => {setOrgFilter(val); setPagination(p => ({...p, current: 1}));}} style={{ width: 180 }} options={organizations.map(o => ({label: o.name, value: o.id}))} /></Form.Item></Col>
+                    <Col><Form.Item label="Status" style={{ marginBottom: 0 }}><Select value={statusFilter} onChange={(val) => {setStatusFilter(val); setPagination(p => ({...p, current: 1}));}} style={{ width: 120 }}><Select.Option value="all">All</Select.Option><Select.Option value="active">Active</Select.Option><Select.Option value="inactive">Inactive</Select.Option></Select></Form.Item></Col>
+                    <Col><Form.Item label="Updated At" style={{ marginBottom: 0 }}><RangePicker onChange={(dates) => {setDateRange(dates); setPagination(p => ({...p, current: 1}));}} /></Form.Item></Col>
                 </Row>
             </div>
 
             <Table
-                columns={columns}
+                columns={getColumns()}
                 dataSource={branches}
                 rowKey="id"
                 loading={loading}
-                pagination={{ pageSize: 10 }}
+                pagination={{...pagination, showSizeChanger: true, pageSizeOptions: ['10', '20', '50', '100'], showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`}}
+                onChange={handleTableChange}
                 onRow={(record) => ({ onDoubleClick: () => navigate(`/master/branches/${record.id}`)})}
             />
 
