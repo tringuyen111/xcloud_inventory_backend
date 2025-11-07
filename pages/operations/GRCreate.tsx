@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
 import {
     Warehouse,
@@ -43,12 +43,13 @@ type GoodsModelWithOptions = {
     code: string;
     name: string;
     tracking_type: 'NONE' | 'LOT' | 'SERIAL';
-    uoms: { id: number; name: string } | null;
+    base_uom: { id: number; name: string } | null;
 };
 type PartnerWithOptions = { id: number; name: string };
 
 type EditableLine = {
-    key: number;
+    key: number; // For React list keys
+    id?: number; // DB ID for existing lines
     goods_model_id?: number;
     location_id?: number | null;
     expected_qty?: number;
@@ -61,8 +62,9 @@ const GR_TRANSACTION_TYPES: GRTransactionType[] = [
 ];
 
 // --- Main Component ---
-const GRCreatePageContent: React.FC = () => {
+const GRCreateEditPage: React.FC<{ isEditMode?: boolean }> = ({ isEditMode = false }) => {
     const navigate = useNavigate();
+    const { id: grId } = useParams<{ id: string }>();
     const [form] = Form.useForm();
     const { notification } = App.useApp();
     const user = useAuthStore((state) => state.user);
@@ -71,7 +73,7 @@ const GRCreatePageContent: React.FC = () => {
     // --- State Management ---
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-
+    
     // Dropdown/AutoComplete data
     const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [partners, setPartners] = useState<PartnerWithOptions[]>([]);
@@ -81,10 +83,10 @@ const GRCreatePageContent: React.FC = () => {
     // Line items state
     const [lines, setLines] = useState<EditableLine[]>([]);
     const [nextKey, setNextKey] = useState(1);
+    const [linesToDelete, setLinesToDelete] = useState<number[]>([]);
 
     // --- Data Fetching ---
-    const fetchInitialData = useCallback(async () => {
-        setLoading(true);
+    const fetchDependencies = useCallback(async () => {
         try {
             const [whRes, partnerRes, gmRes] = await Promise.all([
                 supabase.from('warehouses').select('id, name').eq('is_active', true),
@@ -94,81 +96,93 @@ const GRCreatePageContent: React.FC = () => {
             if (whRes.error) throw whRes.error;
             if (partnerRes.error) throw partnerRes.error;
             if (gmRes.error) throw gmRes.error;
-
             setWarehouses(whRes.data || []);
             setPartners(partnerRes.data || []);
             setGoodsModels(gmRes.data as any[] || []);
         } catch (error: any) {
-            notification.error({
-                message: 'Error fetching initial data',
-                description: error.message
-            });
-        } finally {
-            setLoading(false);
+            notification.error({ message: 'Error fetching dependencies', description: error.message });
         }
     }, [notification]);
 
-    useEffect(() => {
-        fetchInitialData();
-    }, [fetchInitialData]);
+    const fetchGrForEdit = useCallback(async () => {
+        if (!grId) return;
+        try {
+            const { data, error } = await supabase.from('goods_receipts').select('*, gr_lines(*)').eq('id', grId).single();
+            if (error) throw error;
+            
+            form.setFieldsValue({
+                ...data,
+                receipt_date: data.receipt_date ? dayjs(data.receipt_date) : null,
+            });
 
-    // Fetch locations when warehouse changes
+            const loadedLines = data.gr_lines.map((line, index) => {
+                const model = goodsModels.find(m => m.id === line.goods_model_id);
+                return {
+                    ...line,
+                    key: -(index + 1), // Use negative keys for existing items
+                    uom_name: model?.base_uom?.name || '',
+                    tracking_type: model?.tracking_type,
+                };
+            });
+            setLines(loadedLines);
+            setNextKey(1); // Reset key counter for new lines
+
+        } catch (error: any) {
+             notification.error({ message: 'Error fetching Goods Receipt data', description: error.message });
+        }
+    }, [grId, form, notification, goodsModels]);
+    
+    useEffect(() => {
+        setLoading(true);
+        fetchDependencies().then(() => {
+            if (isEditMode) {
+                fetchGrForEdit().finally(() => setLoading(false));
+            } else {
+                setLoading(false);
+            }
+        });
+    }, [fetchDependencies, fetchGrForEdit, isEditMode]);
+
     useEffect(() => {
         if (selectedWarehouseId) {
-            const fetchLocations = async () => {
-                const { data, error } = await supabase
-                    .from('locations')
-                    .select('id, name')
-                    .eq('warehouse_id', selectedWarehouseId)
-                    .eq('is_active', true);
-                if (error) {
-                    notification.error({
-                        message: 'Failed to fetch locations',
-                        description: error.message
-                    });
-                } else {
-                    setLocations(data || []);
-                    // Reset location for existing lines if warehouse changes
-                    setLines(prevLines => prevLines.map(line => ({ ...line,
-                        location_id: undefined
-                    })));
-                }
-            };
-            fetchLocations();
+            supabase.from('locations').select('id, name').eq('warehouse_id', selectedWarehouseId).eq('is_active', true)
+                .then(({ data, error }) => {
+                    if (error) notification.error({ message: 'Failed to fetch locations', description: error.message });
+                    else setLocations(data || []);
+                });
         } else {
             setLocations([]);
         }
     }, [selectedWarehouseId, notification]);
 
+
     // --- UI Handlers for Lines ---
-    const handleAddLine = () => {
-        const newLine: EditableLine = {
-            key: nextKey,
-            expected_qty: 1
-        };
-        setLines(prev => [...prev, newLine]);
-        setNextKey(prev => prev + 1);
-    };
+    const handleAddLine = () => setLines(prev => [...prev, { key: nextKey, expected_qty: 1 }]) || setNextKey(p => p + 1);
 
     const handleLineChange = (key: number, field: keyof EditableLine, value: any) => {
-        const newLines = lines.map(line => {
+        if (field === 'goods_model_id' && lines.some(line => line.goods_model_id === value && line.key !== key)) {
+            notification.error({ message: "Model already added. Please edit the existing line." });
+            return;
+        }
+        setLines(lines.map(line => {
             if (line.key === key) {
-                const updatedLine = { ...line,
-                    [field]: value
-                };
+                const updatedLine = { ...line, [field]: value };
                 if (field === 'goods_model_id') {
                     const model = goodsModels.find(m => m.id === value);
-                    updatedLine.uom_name = model?.uoms?.name;
+                    updatedLine.uom_name = model?.base_uom?.name;
                     updatedLine.tracking_type = model?.tracking_type;
                 }
                 return updatedLine;
             }
             return line;
-        });
-        setLines(newLines);
+        }));
     };
-
+    
     const handleRemoveLine = (key: number) => {
+        const lineToRemove = lines.find(l => l.key === key);
+        if (lineToRemove?.id) { // If it's an existing line from DB
+            setLinesToDelete(prev => [...prev, lineToRemove.id!]);
+        }
         setLines(lines.filter(line => line.key !== key));
     };
 
@@ -176,221 +190,125 @@ const GRCreatePageContent: React.FC = () => {
     const handleSubmit = async (isDraft: boolean) => {
         setIsSaving(true);
         try {
-            if (!user) throw new Error('You must be logged in to perform this action.');
-            
+            if (!user) throw new Error('You must be logged in.');
             const headerValues = await form.validateFields();
-             if (!isDraft) {
-                 if (lines.length === 0) throw new Error('Please add at least one line item to create.');
-                for (const line of lines) {
-                    if (!line.goods_model_id || !line.expected_qty || line.expected_qty <= 0) {
-                         throw new Error('All line items must have a Goods Model and an expected quantity greater than 0.');
-                    }
-                }
+            if (!isDraft && lines.length === 0) throw new Error('Please add at least one line item.');
+            
+            const status = isDraft ? 'DRAFT' : 'CREATED';
+            
+            // FIX: Handle optional receipt_date gracefully
+            const headerPayload: any = {
+                ...headerValues,
+                status: isEditMode ? (headerValues.status === 'DRAFT' ? status : headerValues.status) : status,
+                [isEditMode ? 'updated_by' : 'created_by']: user.id,
+            };
+            
+            if (headerValues.receipt_date) {
+                headerPayload.receipt_date = dayjs(headerValues.receipt_date).toISOString();
+            } else {
+                headerPayload.receipt_date = null; // Explicitly set to null if empty
             }
 
-            // 1. Insert Header
-            const { data: gr, error: grError } = await supabase
-                .from('goods_receipts')
-                .insert({
-                    warehouse_id: headerValues.warehouse_id,
-                    receipt_date: dayjs(headerValues.receipt_date).toISOString(),
-                    transaction_type: headerValues.transaction_type,
-                    status: isDraft ? 'DRAFT' : 'CREATED',
-                    notes: headerValues.notes,
-                    partner_name: headerValues.partner_name,
-                    partner_reference: headerValues.partner_reference,
-                    created_by: user.id
-                })
-                .select()
-                .single();
-
+            // Upsert Header
+            const { data: gr, error: grError } = isEditMode
+                ? await supabase.from('goods_receipts').update(headerPayload).eq('id', grId).select().single()
+                : await supabase.from('goods_receipts').insert(headerPayload).select().single();
             if (grError) throw grError;
 
-            // 2. Insert Lines
-            if (lines.length > 0) {
-                 const linesToInsert = lines
-                    .filter(line => line.goods_model_id && line.expected_qty)
-                    .map(line => ({
-                        gr_id: gr.id,
-                        goods_model_id: line.goods_model_id!,
-                        location_id: line.location_id,
-                        expected_qty: line.expected_qty!,
-                     }));
-                
-                if (linesToInsert.length > 0) {
-                    const { error: linesError } = await supabase.from('gr_lines').insert(linesToInsert);
-                    if (linesError) {
-                        // Attempt to roll back header insertion if lines fail
-                        await supabase.from('goods_receipts').delete().eq('id', gr.id);
-                        throw linesError;
-                    }
-                }
+            // Delete marked lines
+            if (linesToDelete.length > 0) {
+                const { error: deleteError } = await supabase.from('gr_lines').delete().in('id', linesToDelete);
+                if (deleteError) throw deleteError;
             }
 
-            notification.success({ message: `Goods Receipt successfully ${isDraft ? 'saved as draft' : 'created'}` });
+            // Upsert Lines
+            const linesToUpsert = lines.filter(l => l.goods_model_id && l.expected_qty).map(l => ({
+                id: l.id, // Supabase handles upsert if id exists, insert if null/undefined
+                gr_id: gr.id,
+                goods_model_id: l.goods_model_id!,
+                location_id: l.location_id,
+                expected_qty: l.expected_qty!,
+            }));
+            if (linesToUpsert.length > 0) {
+                 const { error: linesError } = await supabase.from('gr_lines').upsert(linesToUpsert);
+                 if (linesError) throw linesError;
+            }
+
+            notification.success({ message: `Goods Receipt successfully ${isEditMode ? 'updated' : 'created'}` });
             navigate(`/operations/gr/${gr.id}`);
 
         } catch (error: any) {
-            notification.error({
-                message: 'Submission Failed',
-                description: error.message || 'Please check all required fields and line items.'
-            });
+            notification.error({ message: 'Submission Failed', description: error.message });
         } finally {
             setIsSaving(false);
         }
     };
 
     // --- Memoized Options and Columns ---
-    const goodsModelOptions = useMemo(() =>
-        goodsModels.map(gm => ({
-            value: gm.id,
-            label: `[${gm.code}] ${gm.name}`
-        })), [goodsModels]);
+    const goodsModelOptions = useMemo(() => goodsModels.map(gm => ({ value: gm.id, label: `[${gm.code}] ${gm.name}` })), [goodsModels]);
+    const partnerOptions = useMemo(() => partners.map(p => ({ label: p.name, value: p.name })), [partners]);
 
-    const partnerOptions = useMemo(() =>
-        partners.map(p => ({
-            label: p.name,
-            value: p.name
-        })), [partners]);
-
-    const lineColumns = useMemo(() => [{
-        title: 'Goods Model',
-        dataIndex: 'goods_model_id',
-        width: '35%',
-        render: (_: any, record: EditableLine) => (
-            <Select
-                showSearch
-                allowClear
-                value={record.goods_model_id}
-                placeholder="Search by name or code..."
-                options={goodsModelOptions}
-                onChange={(value) => handleLineChange(record.key, 'goods_model_id', value)}
-                filterOption={(inputValue, option) =>
-                    (option?.label ?? '').toLowerCase().includes(inputValue.toLowerCase())
-                }
-                style={{ width: '100%' }}
-            />
-        )
-    },
-    { title: 'UoM', dataIndex: 'uom_name', width: '8%', render: (text: string) => <Typography.Text>{text || '-'}</Typography.Text> },
-    { title: 'Tracking', dataIndex: 'tracking_type', width: '10%', render: (type: string) => type ? <Tag>{type}</Tag> : '-' },
-    {
-        title: 'Location',
-        dataIndex: 'location_id',
-        width: '22%',
-        render: (_: any, record: EditableLine) => (
-            <Select
-                value={record.location_id}
-                placeholder="Select location"
-                options={locations.map(l => ({ label: l.name, value: l.id }))}
-                onChange={(value) => handleLineChange(record.key, 'location_id', value)}
-                style={{ width: '100%' }}
-                allowClear
-                disabled={!selectedWarehouseId}
-            />
-        )
-    },
-    {
-        title: 'Expected Qty',
-        dataIndex: 'expected_qty',
-        width: '15%',
-        align: 'right' as const,
-        render: (_: any, record: EditableLine) => (
-            <InputNumber
-                min={1}
-                value={record.expected_qty}
-                onChange={(value) => handleLineChange(record.key, 'expected_qty', value)}
-                style={{ width: '100%' }}
-            />
-        )
-    },
-    {
-        title: 'Action',
-        key: 'action',
-        width: '10%',
-        align: 'center' as const,
-        render: (_: any, record: EditableLine) => (
+    const lineColumns = useMemo(() => [
+        { title: 'Goods Model', dataIndex: 'goods_model_id', width: '35%', render: (_: any, record: EditableLine) => (
+            <Select showSearch allowClear value={record.goods_model_id} placeholder="Search by name or code..." options={goodsModelOptions} onChange={(value) => handleLineChange(record.key, 'goods_model_id', value)} filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())} style={{ width: '100%' }} />
+        )},
+        { title: 'UoM', dataIndex: 'uom_name', width: '8%', render: (text: string) => <Typography.Text>{text || '-'}</Typography.Text> },
+        { title: 'Tracking', dataIndex: 'tracking_type', width: '10%', render: (type: string) => type ? <Tag>{type}</Tag> : '-' },
+        { title: 'Location', dataIndex: 'location_id', width: '22%', render: (_: any, record: EditableLine) => (
+            <Select allowClear value={record.location_id} placeholder={!isEditMode ? "N/A at creation" : "Select location"} options={locations.map(l => ({ label: l.name, value: l.id }))} onChange={(value) => handleLineChange(record.key, 'location_id', value)} style={{ width: '100%' }} disabled={!isEditMode} />
+        )},
+        { title: 'Expected Qty', dataIndex: 'expected_qty', width: '15%', align: 'right' as const, render: (_: any, record: EditableLine) => (
+            <InputNumber min={1} value={record.expected_qty} onChange={(value) => handleLineChange(record.key, 'expected_qty', value)} style={{ width: '100%' }} />
+        )},
+        { title: 'Action', key: 'action', width: '10%', align: 'center' as const, render: (_: any, record: EditableLine) => (
             <Popconfirm title="Sure to delete?" onConfirm={() => handleRemoveLine(record.key)}>
                 <Button icon={<DeleteOutlined />} danger type="text" />
             </Popconfirm>
-        )
-    },
-    ], [lines, goodsModelOptions, locations, selectedWarehouseId]);
+        )},
+    ], [lines, goodsModelOptions, locations, isEditMode, handleLineChange, handleRemoveLine]);
+
 
     // --- Render ---
     if (loading) return <Spin fullscreen />;
+    const title = isEditMode ? `Edit Goods Receipt (GR-${grId})` : "Create Goods Receipt";
+    const description = isEditMode ? "Update details for this goods receipt." : "Create a new goods receipt for incoming inventory.";
     
     return (
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <PageHeader title="Create Goods Receipt" description="Create a new goods receipt for incoming inventory." />
-            
-            <Form form={form} layout="vertical" initialValues={{ transaction_type: 'PURCHASE', receipt_date: dayjs() }}>
+            <PageHeader title={title} description={description} />
+            <Form form={form} layout="vertical" initialValues={{ transaction_type: 'PURCHASE' }}>
                 <Card title="Information">
                     <Row gutter={16}>
-                        <Col span={8}>
-                            <Form.Item name="transaction_type" label="Transaction Type" rules={[{ required: true }]}>
-                                <Select options={GR_TRANSACTION_TYPES.map(t => ({ label: t.replace(/_/g, ' '), value: t }))} />
-                            </Form.Item>
-                        </Col>
-                        <Col span={8}>
-                            <Form.Item name="warehouse_id" label="Warehouse" rules={[{ required: true }]}>
-                                <Select showSearch filterOption placeholder="Select warehouse" options={warehouses.map(w => ({ label: w.name, value: w.id }))} />
-                            </Form.Item>
-                        </Col>
-                        <Col span={8}>
-                            <Form.Item name="receipt_date" label="Receipt Date" rules={[{ required: true }]}>
-                                <DatePicker style={{ width: '100%' }} />
-                            </Form.Item>
-                        </Col>
+                        <Col span={8}><Form.Item name="transaction_type" label="Transaction Type" rules={[{ required: true }]}><Select options={GR_TRANSACTION_TYPES.map(t => ({ label: t.replace(/_/g, ' '), value: t }))} /></Form.Item></Col>
+                        <Col span={8}><Form.Item name="warehouse_id" label="Warehouse" rules={[{ required: true }]}><Select showSearch filterOption placeholder="Select warehouse" options={warehouses.map(w => ({ label: w.name, value: w.id }))} /></Form.Item></Col>
+                        <Col span={8}><Form.Item name="receipt_date" label="Expected Receipt Date"><DatePicker style={{ width: '100%' }} /></Form.Item></Col>
                     </Row>
                     <Row gutter={16}>
-                        <Col span={12}>
-                           <Form.Item name="partner_name" label="Partner Name">
-                               <AutoComplete
-                                    options={partnerOptions}
-                                    style={{ width: '100%' }}
-                                    placeholder="Select or enter partner name"
-                                    filterOption={(inputValue, option) =>
-                                        option!.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
-                                    }
-                                />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                           <Form.Item name="partner_reference" label="Partner Reference">
-                                <Input placeholder="e.g., PO-123, ASN-456" />
-                            </Form.Item>
-                        </Col>
+                        <Col span={12}><Form.Item name="partner_name" label="Partner Name"><AutoComplete options={partnerOptions} style={{ width: '100%' }} placeholder="Select or enter partner name" filterOption={(inputValue, option) => option!.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1} /></Form.Item></Col>
+                        <Col span={12}><Form.Item name="partner_reference" label="Partner Reference"><Input placeholder="e.g., PO-123, ASN-456" /></Form.Item></Col>
                     </Row>
-                     <Row>
-                        <Col span={24}>
-                             <Form.Item name="notes" label="Notes">
-                                <Input.TextArea rows={2} placeholder="Add any relevant notes here..." />
-                            </Form.Item>
-                        </Col>
-                    </Row>
+                     <Row><Col span={24}><Form.Item name="notes" label="Notes"><Input.TextArea rows={2} placeholder="Add any relevant notes here..." /></Form.Item></Col></Row>
                 </Card>
             </Form>
-
             <Card title="Line Items" extra={<Button icon={<PlusOutlined />} onClick={handleAddLine} type="dashed">Add Item</Button>}>
                 <Table dataSource={lines} columns={lineColumns} pagination={false} rowKey="key" size="small" />
             </Card>
-
             <Row justify="end">
                 <Space>
                     <Button icon={<RollbackOutlined />} onClick={() => navigate('/operations/gr')} danger>Cancel</Button>
                     <Button icon={<SaveOutlined />} onClick={() => handleSubmit(true)} loading={isSaving}>Save as Draft</Button>
-                    <Button type="primary" icon={<CheckOutlined />} onClick={() => handleSubmit(false)} loading={isSaving}>Create</Button>
+                    <Button type="primary" icon={<CheckOutlined />} onClick={() => handleSubmit(false)} loading={isSaving}>{isEditMode ? 'Update' : 'Create'}</Button>
                 </Space>
             </Row>
         </Space>
     );
 };
 
-const GRCreatePage: React.FC = () => (
+// Wrapper to provide App context (notification, modal)
+const GRCreateWrapper: React.FC<{ isEditMode?: boolean }> = ({ isEditMode }) => (
     <App>
-        <GRCreatePageContent />
+        <GRCreateEditPage isEditMode={isEditMode} />
     </App>
 );
 
-export default GRCreatePage;
+export default GRCreateWrapper;

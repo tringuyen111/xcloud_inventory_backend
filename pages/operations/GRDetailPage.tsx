@@ -18,7 +18,7 @@ type GRWithDetails = GoodsReceipt & {
         goods_model: {
             name: string;
             code: string;
-            uom: { name: string } | null;
+            base_uom: { name: string } | null;
         } | null;
     })[];
 };
@@ -42,7 +42,7 @@ const GRDetailPageContent: React.FC = () => {
                 .select(`
                     *,
                     warehouse:warehouses(name),
-                    gr_lines(*, goods_model:goods_models(name, code, uom:uoms(name)))
+                    gr_lines(*, goods_model:goods_models(name, code, base_uom:uoms(name)))
                 `)
                 .eq('id', id)
                 .single();
@@ -89,7 +89,7 @@ const GRDetailPageContent: React.FC = () => {
         { title: 'Goods Model', dataIndex: ['goods_model', 'name'], key: 'goods_model' },
         { title: 'Expected Qty', dataIndex: 'expected_qty', key: 'expected_qty', align: 'right' as const },
         { title: 'Received Qty', dataIndex: 'received_qty', key: 'received_qty', align: 'right' as const, render: (qty: number) => qty || 0 },
-        { title: 'UoM', dataIndex: ['goods_model', 'uom', 'name'], key: 'uom' },
+        { title: 'UoM', dataIndex: ['goods_model', 'base_uom', 'name'], key: 'uom' },
         { title: 'Lot/Serial', key: 'lot_serial', render: (_: any, record: GRLine) => record.lot_number || record.serial_number || '-' },
     ];
     

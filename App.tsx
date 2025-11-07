@@ -9,8 +9,7 @@ import useAuthStore from './stores/authStore';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import OnhandPage from './pages/onhand/OnhandPage';
 import GRPage from './pages/operations/GRPage';
-import GRCreatePage from './pages/operations/GRCreatePage';
-import GRCreate from './pages/operations/GRCreate'; // New Component
+import GRCreate from './pages/operations/GRCreate'; // This will now handle both create and edit
 import GRDetailPage from './pages/operations/GRDetailPage';
 import GIPage from './pages/operations/GIPage';
 import ICPage from './pages/operations/ICPage';
@@ -88,7 +87,7 @@ const App: React.FC = () => {
                                 <Route path="/operations/gr" element={<GRPage />} />
                                 <Route path="/operations/gr/create" element={<GRCreate />} />
                                 <Route path="/operations/gr/:id" element={<GRDetailPage />} />
-                                <Route path="/operations/gr/:id/edit" element={<GRCreatePage isEditMode={true} />} />
+                                <Route path="/operations/gr/:id/edit" element={<GRCreate isEditMode={true} />} />
                                 <Route path="/operations/gi" element={<GIPage />} />
                                 <Route path="/operations/ic" element={<ICPage />} />
                                 <Route path="/operations/gt" element={<GTPage />} />

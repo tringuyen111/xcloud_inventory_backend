@@ -1,4 +1,5 @@
 
+
 export type Json =
   | string
   | number
@@ -127,7 +128,7 @@ export interface Database {
           created_by: string | null
           updated_at: string | null
           updated_by: string | null
-          receipt_date: string
+          receipt_date: string | null
           partner_reference: string | null
           warehouse_id: number
           status: Database["public"]["Enums"]["gr_status"]
@@ -141,7 +142,7 @@ export interface Database {
           created_by?: string | null
           updated_at?: string | null
           updated_by?: string | null
-          receipt_date: string
+          receipt_date?: string | null
           partner_reference?: string | null
           warehouse_id: number
           status: Database["public"]["Enums"]["gr_status"]
@@ -155,7 +156,7 @@ export interface Database {
           created_by?: string | null
           updated_at?: string | null
           updated_by?: string | null
-          receipt_date?: string
+          receipt_date?: string | null
           partner_reference?: string | null
           warehouse_id?: number
           status?: Database["public"]["Enums"]["gr_status"]
