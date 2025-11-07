@@ -7,32 +7,38 @@ import useAuthStore from './stores/authStore';
 
 // Page imports
 import DashboardPage from './pages/dashboard/DashboardPage';
-import OnhandPage from './pages/onhand/OnhandPage';
-import GRPage from './pages/operations/GRPage';
-import GRCreate from './pages/operations/GRCreate'; // This will now handle both create and edit
-import GRDetailPage from './pages/operations/GRDetailPage';
+import OnhandPage from './pages/operations/Onhand/OnhandListPage';
+
+// Operations Pages
+import GRListPage from './pages/operations/GoodsReceipts/GRListPage';
+import GRCreatePage from './pages/operations/GoodsReceipts/GRCreatePage';
+import GRViewPage from './pages/operations/GoodsReceipts/GRViewPage';
 import GIPage from './pages/operations/GIPage';
 import ICPage from './pages/operations/ICPage';
 import GTPage from './pages/operations/GTPage';
 import PAPage from './pages/operations/PAPage';
-import GoodsTypesListPage from './pages/goods/GoodsTypesListPage';
-import GoodsTypeDetailPage from './pages/goods/GoodsTypeDetailPage';
-import GoodsModelsListPage from './pages/goods/GoodsModelsListPage';
-import GoodsModelDetailPage from './pages/goods/GoodsModelDetailPage';
-import OrganizationsListPage from './pages/master/OrganizationsListPage';
-import OrganizationDetailPage from './pages/master/OrganizationDetailPage';
-import BranchesListPage from './pages/master/BranchesListPage';
-import BranchDetailPage from './pages/master/BranchDetailPage';
-import WarehousesListPage from './pages/master/WarehousesListPage';
-import WarehouseDetailPage from './pages/master/WarehouseDetailPage';
-import LocationsListPage from './pages/master/LocationsListPage';
-import LocationDetailPage from './pages/master/LocationDetailPage';
-import UomCategoriesListPage from './pages/master/UomCategoriesListPage';
-import UomCategoryDetailPage from './pages/master/UomCategoryDetailPage';
-import UomsListPage from './pages/master/UomsListPage';
-import UomDetailPage from './pages/master/UomDetailPage';
-import PartnersListPage from './pages/master/PartnersListPage';
-import PartnerDetailPage from './pages/master/PartnerDetailPage';
+
+// Master Data Pages
+import GoodsTypesListPage from './pages/master-data/GoodsTypes/GoodsTypesListPage';
+import GoodsTypeDetailPage from './pages/master-data/GoodsTypes/GoodsTypeDetailPage';
+import GoodsModelsListPage from './pages/master-data/GoodsModels/GoodsModelsListPage';
+import GoodsModelDetailPage from './pages/master-data/GoodsModels/GoodsModelDetailPage';
+import OrganizationsListPage from './pages/master-data/Organizations/OrganizationsListPage';
+import OrganizationDetailPage from './pages/master-data/Organizations/OrganizationDetailPage';
+import BranchesListPage from './pages/master-data/Branches/BranchesListPage';
+import BranchDetailPage from './pages/master-data/Branches/BranchDetailPage';
+import WarehousesListPage from './pages/master-data/Warehouses/WarehousesListPage';
+import WarehouseDetailPage from './pages/master-data/Warehouses/WarehouseDetailPage';
+import LocationsListPage from './pages/master-data/Locations/LocationsListPage';
+import LocationDetailPage from './pages/master-data/Locations/LocationDetailPage';
+import UomCategoriesListPage from './pages/master-data/UOMCategories/UomCategoriesListPage';
+import UomCategoryDetailPage from './pages/master-data/UOMCategories/UomCategoryDetailPage';
+import UomsListPage from './pages/master-data/UOMs/UomsListPage';
+import UomDetailPage from './pages/master-data/UOMs/UomDetailPage';
+import PartnersListPage from './pages/master-data/Partners/PartnersListPage';
+import PartnerDetailPage from './pages/master-data/Partners/PartnerDetailPage';
+
+// Other Pages
 import ReportsPage from './pages/reports/ReportsPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import DbSchemaPage from './pages/dev/DbSchemaPage';
@@ -84,36 +90,34 @@ const App: React.FC = () => {
                                 <Route path="/onhand" element={<OnhandPage />} />
                                 
                                 {/* Operations */}
-                                <Route path="/operations/gr" element={<GRPage />} />
-                                <Route path="/operations/gr/create" element={<GRCreate />} />
-                                <Route path="/operations/gr/:id" element={<GRDetailPage />} />
-                                <Route path="/operations/gr/:id/edit" element={<GRCreate isEditMode={true} />} />
+                                <Route path="/operations/gr" element={<GRListPage />} />
+                                <Route path="/operations/gr/create" element={<GRCreatePage />} />
+                                <Route path="/operations/gr/:id" element={<GRViewPage />} />
+                                <Route path="/operations/gr/:id/edit" element={<GRCreatePage />} />
                                 <Route path="/operations/gi" element={<GIPage />} />
                                 <Route path="/operations/ic" element={<ICPage />} />
                                 <Route path="/operations/gt" element={<GTPage />} />
                                 <Route path="/operations/pa" element={<PAPage />} />
                                 
-                                {/* Goods */}
-                                <Route path="/goods/types" element={<GoodsTypesListPage />} />
-                                <Route path="/goods/types/:id" element={<GoodsTypeDetailPage />} />
-                                <Route path="/goods/models" element={<GoodsModelsListPage />} />
-                                <Route path="/goods/models/:id" element={<GoodsModelDetailPage />} />
-
                                 {/* Master Data */}
-                                <Route path="/master/organizations" element={<OrganizationsListPage />} />
-                                <Route path="/master/organizations/:id" element={<OrganizationDetailPage />} />
-                                <Route path="/master/branches" element={<BranchesListPage />} />
-                                <Route path="/master/branches/:id" element={<BranchDetailPage />} />
-                                <Route path="/master/warehouses" element={<WarehousesListPage />} />
-                                <Route path="/master/warehouses/:id" element={<WarehouseDetailPage />} />
-                                <Route path="/master/locations" element={<LocationsListPage />} />
-                                <Route path="/master/locations/:id" element={<LocationDetailPage />} />
-                                <Route path="/master/uom-categories" element={<UomCategoriesListPage />} />
-                                <Route path="/master/uom-categories/:id" element={<UomCategoryDetailPage />} />
-                                <Route path="/master/uoms" element={<UomsListPage />} />
-                                <Route path="/master/uoms/:id" element={<UomDetailPage />} />
-                                <Route path="/master/partners" element={<PartnersListPage />} />
-                                <Route path="/master/partners/:id" element={<PartnerDetailPage />} />
+                                <Route path="/master-data/goods-types" element={<GoodsTypesListPage />} />
+                                <Route path="/master-data/goods-types/:id" element={<GoodsTypeDetailPage />} />
+                                <Route path="/master-data/goods-models" element={<GoodsModelsListPage />} />
+                                <Route path="/master-data/goods-models/:id" element={<GoodsModelDetailPage />} />
+                                <Route path="/master-data/organizations" element={<OrganizationsListPage />} />
+                                <Route path="/master-data/organizations/:id" element={<OrganizationDetailPage />} />
+                                <Route path="/master-data/branches" element={<BranchesListPage />} />
+                                <Route path="/master-data/branches/:id" element={<BranchDetailPage />} />
+                                <Route path="/master-data/warehouses" element={<WarehousesListPage />} />
+                                <Route path="/master-data/warehouses/:id" element={<WarehouseDetailPage />} />
+                                <Route path="/master-data/locations" element={<LocationsListPage />} />
+                                <Route path="/master-data/locations/:id" element={<LocationDetailPage />} />
+                                <Route path="/master-data/uom-categories" element={<UomCategoriesListPage />} />
+                                <Route path="/master-data/uom-categories/:id" element={<UomCategoryDetailPage />} />
+                                <Route path="/master-data/uoms" element={<UomsListPage />} />
+                                <Route path="/master-data/uoms/:id" element={<UomDetailPage />} />
+                                <Route path="/master-data/partners" element={<PartnersListPage />} />
+                                <Route path="/master-data/partners/:id" element={<PartnerDetailPage />} />
                                 
                                 {/* Other */}
                                 <Route path="/reports" element={<ReportsPage />} />

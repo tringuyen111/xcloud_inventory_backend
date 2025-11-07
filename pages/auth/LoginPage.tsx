@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../../services/supabase';
+import { supabase } from '../../services/supabaseClient';
 import { Form, Input, Button, Alert, Typography, Card } from 'antd';
 import { MailOutlined, LockOutlined } from '@ant-design/icons';
 

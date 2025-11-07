@@ -17,39 +17,60 @@ export interface Database {
           code: string
           created_at: string
           created_by: string | null
-          description: string | null
+          notes: string | null
           id: number
           is_active: boolean
           name: string
           org_id: number
           updated_at: string | null
           updated_by: string | null
+          city: string | null
+          state: string | null
+          postal_code: string | null
+          country: string | null
+          phone: string | null
+          email: string | null
+          manager_name: string | null
         }
         Insert: {
           address?: string | null
           code: string
           created_at?: string
           created_by?: string | null
-          description?: string | null
+          notes?: string | null
           id?: number
           is_active?: boolean
           name: string
           org_id: number
           updated_at?: string | null
           updated_by?: string | null
+          city?: string | null
+          state?: string | null
+          postal_code?: string | null
+          country?: string | null
+          phone?: string | null
+          email?: string | null
+          manager_name?: string | null
         }
         Update: {
           address?: string | null
           code?: string
           created_at?: string
           created_by?: string | null
-          description?: string | null
+          notes?: string | null
           id?: number
           is_active?: boolean
           name?: string
           org_id?: number
           updated_at?: string | null
           updated_by?: string | null
+          city?: string | null
+          state?: string | null
+          postal_code?: string | null
+          country?: string | null
+          phone?: string | null
+          email?: string | null
+          manager_name?: string | null
         }
         Relationships: [
           {
@@ -124,7 +145,6 @@ export interface Database {
       goods_receipts: {
         Row: {
           id: number
-          // FIX: Add missing reference_number property to fix type errors in detail and list pages.
           reference_number: string | null
           created_at: string
           created_by: string | null
@@ -137,10 +157,12 @@ export interface Database {
           notes: string | null
           transaction_type: Database["public"]["Enums"]["gr_transaction_type"]
           partner_name: string | null
+          supplier_id: number | null
+          completed_at: string | null
+          completed_by: string | null
         }
         Insert: {
           id?: number
-          // FIX: Add missing reference_number property.
           reference_number?: string | null
           created_at?: string
           created_by?: string | null
@@ -153,10 +175,12 @@ export interface Database {
           notes?: string | null
           transaction_type: Database["public"]["Enums"]["gr_transaction_type"]
           partner_name?: string | null
+          supplier_id?: number | null
+          completed_at?: string | null
+          completed_by?: string | null
         }
         Update: {
           id?: number
-          // FIX: Add missing reference_number property.
           reference_number?: string | null
           created_at?: string
           created_by?: string | null
@@ -169,6 +193,9 @@ export interface Database {
           notes?: string | null
           transaction_type?: Database["public"]["Enums"]["gr_transaction_type"]
           partner_name?: string | null
+          supplier_id?: number | null
+          completed_at?: string | null
+          completed_by?: string | null
         }
         Relationships: [
           {
@@ -189,6 +216,11 @@ export interface Database {
           lot_number: string | null
           serial_number: string | null
           location_id: number | null
+          manufacturing_date: string | null
+          expiry_date: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string | null
         }
         Insert: {
           id?: number
@@ -199,6 +231,11 @@ export interface Database {
           lot_number?: string | null
           serial_number?: string | null
           location_id?: number | null
+          manufacturing_date?: string | null
+          expiry_date?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string | null
         }
         Update: {
           id?: number
@@ -209,6 +246,11 @@ export interface Database {
           lot_number?: string | null
           serial_number?: string | null
           location_id?: number | null
+          manufacturing_date?: string | null
+          expiry_date?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -334,6 +376,7 @@ export interface Database {
           tax_id: string | null
           updated_at: string | null
           updated_by: string | null
+          website: string | null
         }
         Insert: {
           address?: string | null
@@ -349,6 +392,7 @@ export interface Database {
           tax_id?: string | null
           updated_at?: string | null
           updated_by?: string | null
+          website?: string | null
         }
         Update: {
           address?: string | null
@@ -364,6 +408,7 @@ export interface Database {
           tax_id?: string | null
           updated_at?: string | null
           updated_by?: string | null
+          website?: string | null
         }
         Relationships: []
       }
@@ -519,39 +564,51 @@ export interface Database {
           code: string
           created_at: string
           created_by: string | null
-          description: string | null
+          notes: string | null
           id: number
           is_active: boolean
           name: string
           updated_at: string | null
           updated_by: string | null
           warehouse_type: Database["public"]["Enums"]["warehouse_type"]
+          address: string | null
+          capacity_sqm: number | null
+          manager_name: string | null
+          phone: string | null
         }
         Insert: {
           branch_id: number
           code: string
           created_at?: string
           created_by?: string | null
-          description?: string | null
+          notes?: string | null
           id?: number
           is_active?: boolean
           name: string
           updated_at?: string | null
           updated_by?: string | null
           warehouse_type?: Database["public"]["Enums"]["warehouse_type"]
+          address?: string | null
+          capacity_sqm?: number | null
+          manager_name?: string | null
+          phone?: string | null
         }
         Update: {
           branch_id?: number
           code?: string
           created_at?: string
           created_by?: string | null
-          description?: string | null
+          notes?: string | null
           id?: number
           is_active?: boolean
           name?: string
           updated_at?: string | null
           updated_by?: string | null
           warehouse_type?: Database["public"]["Enums"]["warehouse_type"]
+          address?: string | null
+          capacity_sqm?: number | null
+          manager_name?: string | null
+          phone?: string | null
         }
         Relationships: [
           {

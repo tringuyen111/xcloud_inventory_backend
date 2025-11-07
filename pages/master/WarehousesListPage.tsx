@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../services/supabase';
+// FIX: Corrected supabase client import path
+import { supabase } from '../../services/supabaseClient';
 import { Warehouse, Branch } from '../../types/supabase';
 import {
     Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Modal, Form, Dropdown, Menu, Typography, DatePicker, Checkbox
@@ -268,7 +269,7 @@ const WarehousesListPage: React.FC = () => {
                     <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item>
                     <Form.Item name="warehouse_type" label="Warehouse Type" initialValue="NORMAL"><Select options={WAREHOUSE_TYPES.map(t => ({ label: t, value: t }))} /></Form.Item>
                     <Form.Item name="is_active" label="Status" initialValue={true}><Select><Select.Option value={true}>Active</Select.Option><Select.Option value={false}>Inactive</Select.Option></Select></Form.Item>
-                    <Form.Item name="description" label="Notes"><Input.TextArea rows={3} /></Form.Item>
+                    <Form.Item name="notes" label="Notes"><Input.TextArea rows={3} /></Form.Item>
                 </Form>
             </Modal>
         </Card>

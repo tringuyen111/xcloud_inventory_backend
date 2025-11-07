@@ -12,10 +12,7 @@ const pathNameMapping: { [key: string]: string } = {
   ic: 'Inventory Count',
   gt: 'Goods Transfer',
   pa: 'Putaway',
-  goods: 'Goods',
-  types: 'Goods Types',
-  models: 'Goods Models',
-  master: 'Master Data',
+  'master-data': 'Master Data',
   organizations: 'Organizations',
   branches: 'Branches',
   warehouses: 'Warehouses',
@@ -23,12 +20,16 @@ const pathNameMapping: { [key: string]: string } = {
   'uom-categories': 'UoM Categories',
   uoms: 'Units of Measure',
   partners: 'Partners',
+  'goods-types': 'Goods Types',
+  'goods-models': 'Goods Models',
   reports: 'Reports',
   settings: 'Settings',
   'db-schema': 'DB Schema',
+  create: 'Create',
+  edit: 'Edit'
 };
 
-const nonLinkablePaths = ['operations', 'goods', 'master'];
+const nonLinkablePaths = ['operations', 'master-data'];
 
 const Breadcrumb: React.FC = () => {
   const location = useLocation();
@@ -41,8 +42,18 @@ const Breadcrumb: React.FC = () => {
     const isNonLinkable = nonLinkablePaths.includes(snippet);
 
     if (!isNaN(Number(snippet))) {
-        return null; 
+      const prevSnippet = pathSnippets[index-1];
+      const prevName = pathNameMapping[prevSnippet] || prevSnippet;
+      // Show "Detail" for numeric IDs
+      return (
+        <AntBreadcrumb.Item key={url}>
+          <span>{prevName} Detail</span>
+        </AntBreadcrumb.Item>
+      );
     }
+
+    // Don't show create/edit in breadcrumbs as it's part of the page title
+    if (snippet === 'create' || snippet === 'edit') return null;
 
     return (
       <AntBreadcrumb.Item key={url}>

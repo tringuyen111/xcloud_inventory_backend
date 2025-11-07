@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-// FIX: Corrected supabase client import path
-import { supabase } from '../../services/supabaseClient';
-import { Branch, Organization } from '../../types/supabase';
+import { supabase } from '../../../services/supabaseClient';
+import { Branch, Organization } from '../../../types/supabase';
 import {
     Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Modal, Form, Dropdown, Menu, Typography, DatePicker, Checkbox
 } from 'antd';
@@ -9,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     PlusOutlined, ExportOutlined, ProfileOutlined, EllipsisOutlined, EyeOutlined, EditOutlined, DeleteOutlined, DownOutlined
 } from '@ant-design/icons';
-import useAuthStore from '../../stores/authStore';
+import useAuthStore from '../../../stores/authStore';
 import type { TableProps } from 'antd';
 import type { Dayjs } from 'dayjs';
 
@@ -200,8 +199,8 @@ const BranchesListPage: React.FC = () => {
     const getColumns = () => {
         const actionMenu = (record: Branch) => (
             <Menu>
-                <Menu.Item key="1" icon={<EyeOutlined />} onClick={() => navigate(`/master/branches/${record.id}`)}>View</Menu.Item>
-                <Menu.Item key="2" icon={<EditOutlined />} onClick={() => navigate(`/master/branches/${record.id}`)}>Edit</Menu.Item>
+                <Menu.Item key="1" icon={<EyeOutlined />} onClick={() => navigate(`/master-data/branches/${record.id}`)}>View</Menu.Item>
+                <Menu.Item key="2" icon={<EditOutlined />} onClick={() => navigate(`/master-data/branches/${record.id}`)}>Edit</Menu.Item>
                 <Menu.Divider />
                 <Menu.Item key="3" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)}>Delete</Menu.Item>
             </Menu>
@@ -255,7 +254,7 @@ const BranchesListPage: React.FC = () => {
                 loading={loading}
                 pagination={{...pagination, showSizeChanger: true, pageSizeOptions: ['10', '20', '50', '100'], showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`}}
                 onChange={handleTableChange}
-                onRow={(record) => ({ onDoubleClick: () => navigate(`/master/branches/${record.id}`)})}
+                onRow={(record) => ({ onDoubleClick: () => navigate(`/master-data/branches/${record.id}`)})}
             />
 
             <Modal title="Create Branch" open={isModalOpen} onOk={handleSave} onCancel={handleCancel} confirmLoading={isSaving} okText="Save">

@@ -26,18 +26,16 @@ const navItems: NavItem[] = [
         { name: 'Goods Transfer', path: '/operations/gt', icon: <div/> },
         { name: 'Putaway', path: '/operations/pa', icon: <div/> },
     ]},
-    { name: 'Goods', path: '/goods', icon: <CubeIcon />, subItems: [
-        { name: 'Goods Types', path: '/goods/types', icon: <div/> },
-        { name: 'Goods Models', path: '/goods/models', icon: <div/> },
-    ]},
-    { name: 'Master Data', path: '/master', icon: <CubeIcon />, subItems: [
-        { name: 'Organizations', path: '/master/organizations', icon: <div/> },
-        { name: 'Branches', path: '/master/branches', icon: <div/> },
-        { name: 'Warehouses', path: '/master/warehouses', icon: <div/> },
-        { name: 'Locations', path: '/master/locations', icon: <div/> },
-        { name: 'UoM Categories', path: '/master/uom-categories', icon: <div/> },
-        { name: 'Units of Measure', path: '/master/uoms', icon: <div/> },
-        { name: 'Partners', path: '/master/partners', icon: <div/> },
+    { name: 'Master Data', path: '/master-data', icon: <CubeIcon />, subItems: [
+        { name: 'Organizations', path: '/master-data/organizations', icon: <div/> },
+        { name: 'Branches', path: '/master-data/branches', icon: <div/> },
+        { name: 'Warehouses', path: '/master-data/warehouses', icon: <div/> },
+        { name: 'Locations', path: '/master-data/locations', icon: <div/> },
+        { name: 'Partners', path: '/master-data/partners', icon: <div/> },
+        { name: 'UoM Categories', path: '/master-data/uom-categories', icon: <div/> },
+        { name: 'Units of Measure', path: '/master-data/uoms', icon: <div/> },
+        { name: 'Goods Types', path: '/master-data/goods-types', icon: <div/> },
+        { name: 'Goods Models', path: '/master-data/goods-models', icon: <div/> },
     ]},
     { name: 'Reports', path: '/reports', icon: <ChartBarIcon /> },
     { name: 'Settings', path: '/settings', icon: <CogIcon /> },
@@ -50,9 +48,12 @@ const Sidebar: React.FC = () => {
     const [openMenus, setOpenMenus] = useState<string[]>([]);
 
     React.useEffect(() => {
-        const parentPath = '/' + location.pathname.split('/')[1];
-        if(!openMenus.includes(parentPath)){
-            setOpenMenus(prev => [...prev, parentPath]);
+        const pathSegments = location.pathname.split('/');
+        if (pathSegments.length > 2) {
+            const parentPath = `/${pathSegments[1]}`;
+            if(!openMenus.includes(parentPath)){
+                setOpenMenus(prev => [...prev, parentPath]);
+            }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.pathname]);
@@ -79,7 +80,7 @@ const Sidebar: React.FC = () => {
                         {isMenuOpen && (
                             <div className="pl-8 py-2 space-y-1">
                                 {item.subItems.map(subItem => {
-                                    const isSubActive = location.pathname === subItem.path;
+                                    const isSubActive = location.pathname === subItem.path || location.pathname.startsWith(subItem.path);
                                     return (
                                         <NavLink
                                             key={subItem.name}

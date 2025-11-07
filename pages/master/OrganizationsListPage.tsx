@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../services/supabase';
+// FIX: Corrected supabase client import path
+import { supabase } from '../../services/supabaseClient';
 import { Organization } from '../../types/supabase';
 import {
     Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Modal, Form, Dropdown, Menu, Typography, DatePicker, Checkbox
@@ -245,6 +246,7 @@ const OrganizationsListPage: React.FC = () => {
                         <Col span={12}><Form.Item name="tax_id" label="Tax ID"><Input /></Form.Item></Col>
                         <Col span={12}><Form.Item name="phone" label="Phone"><Input /></Form.Item></Col>
                         <Col span={12}><Form.Item name="email" label="Email" rules={[{ type: 'email' }]}><Input /></Form.Item></Col>
+                        <Col span={12}><Form.Item name="website" label="Website"><Input /></Form.Item></Col>
                         <Col span={12}><Form.Item name="is_active" label="Status" initialValue={true}><Select><Select.Option value={true}>Active</Select.Option><Select.Option value={false}>Inactive</Select.Option></Select></Form.Item></Col>
                         <Col span={24}><Form.Item name="address" label="Address"><Input.TextArea rows={3} /></Form.Item></Col>
                         <Col span={24}><Form.Item name="notes" label="Notes"><Input.TextArea rows={3} /></Form.Item></Col>

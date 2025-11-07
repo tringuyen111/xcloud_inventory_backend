@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { supabase } from '../../services/supabase';
+import { supabase } from '../../services/supabaseClient';
 import {
   Button, Card, Typography, Spin, Alert, Table, Tabs, Tag, Space
 } from 'antd';

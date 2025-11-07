@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-// FIX: Corrected supabase client import path
-import { supabase } from '../../services/supabaseClient';
-import { Branch, Organization } from '../../types/supabase';
+import { supabase } from '../../../services/supabaseClient';
+import { Branch, Organization } from '../../../types/supabase';
 import {
   Button, Card, Form, Input, Row, Col, Space, App, Spin, Select, Descriptions, Tag, Alert
 } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import { format } from 'date-fns';
-import useAuthStore from '../../stores/authStore';
-import PageHeader from '../../components/layout/PageHeader';
+import useAuthStore from '../../../stores/authStore';
+import PageHeader from '../../../components/layout/PageHeader';
 
 type BranchWithOrg = Branch & { organization?: { name: string } };
 

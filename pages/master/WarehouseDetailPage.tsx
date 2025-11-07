@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../../services/supabase';
+// FIX: Corrected supabase client import path
+import { supabase } from '../../services/supabaseClient';
 import { Warehouse, Branch } from '../../types/supabase';
 import {
   Button, Card, Form, Input, Row, Col, Typography, Space, App, Spin, Select, Descriptions, Tag, Alert
@@ -130,7 +131,7 @@ const WarehouseDetailPageContent: React.FC = () => {
                     <Form.Item name="is_active" label="Status" rules={[{ required: true }]}><Select><Select.Option value={true}>Active</Select.Option><Select.Option value={false}>Inactive</Select.Option></Select></Form.Item>
                 </Col>
                 <Col span={24}>
-                    <Form.Item name="description" label="Notes"><Input.TextArea rows={3} /></Form.Item>
+                    <Form.Item name="notes" label="Notes"><Input.TextArea rows={3} /></Form.Item>
                 </Col>
             </Row>
         </Form>
@@ -143,7 +144,7 @@ const WarehouseDetailPageContent: React.FC = () => {
           <Descriptions.Item label="Status" span={2}>
             <Tag color={warehouse?.is_active ? 'green' : 'red'}>{warehouse?.is_active ? 'Active' : 'Inactive'}</Tag>
           </Descriptions.Item>
-          <Descriptions.Item label="Notes" span={2}>{warehouse?.description}</Descriptions.Item>
+          <Descriptions.Item label="Notes" span={2}>{warehouse?.notes}</Descriptions.Item>
           <Descriptions.Item label="Created At">{warehouse?.created_at ? format(new Date(warehouse.created_at), 'yyyy-MM-dd HH:mm') : '-'}</Descriptions.Item>
           <Descriptions.Item label="Created By">{getUserEmail(warehouse?.created_by)}</Descriptions.Item>
           <Descriptions.Item label="Updated At">{warehouse?.updated_at ? format(new Date(warehouse.updated_at), 'yyyy-MM-dd HH:mm') : '-'}</Descriptions.Item>

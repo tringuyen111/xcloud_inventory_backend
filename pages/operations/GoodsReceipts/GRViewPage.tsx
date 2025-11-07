@@ -1,15 +1,13 @@
-
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../../services/supabaseClient';
-import { GoodsReceipt, GRLine } from '../../types/supabase';
+import { supabase } from '../../../services/supabaseClient';
+import { GoodsReceipt, GRLine } from '../../../types/supabase';
 import {
     Button, Card, Row, Col, Typography, Space, App, Spin, Descriptions, Tag, Alert, Table
 } from 'antd';
 import { EditOutlined, DeleteOutlined, RollbackOutlined } from '@ant-design/icons';
 import { format } from 'date-fns';
-import PageHeader from '../../components/layout/PageHeader';
+import PageHeader from '../../../components/layout/PageHeader';
 
 const { Text } = Typography;
 
@@ -24,7 +22,7 @@ type GRWithDetails = GoodsReceipt & {
     })[];
 };
 
-const GRDetailPageContent: React.FC = () => {
+const GRViewPageContent: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { notification, modal } = App.useApp();
@@ -142,8 +140,8 @@ const GRDetailPageContent: React.FC = () => {
     );
 };
 
-const GRDetailPage: React.FC = () => (
-    <App><GRDetailPageContent /></App>
+const GRViewPage: React.FC = () => (
+    <App><GRViewPageContent /></App>
 );
 
-export default GRDetailPage;
+export default GRViewPage;

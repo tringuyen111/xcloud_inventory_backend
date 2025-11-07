@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-// FIX: Corrected supabase client import path
-import { supabase } from '../../services/supabaseClient';
-import { Organization } from '../../types/supabase';
+import { supabase } from '../../../services/supabaseClient';
+import { Organization } from '../../../types/supabase';
 import {
   Button, Card, Form, Input, Row, Col, Typography, Space, App, Spin, Select, Descriptions, Tag, Alert
 } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import { format } from 'date-fns';
-import useAuthStore from '../../stores/authStore';
-import PageHeader from '../../components/layout/PageHeader';
+import useAuthStore from '../../../stores/authStore';
+import PageHeader from '../../../components/layout/PageHeader';
 
 const OrganizationDetailPageContent: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -144,7 +143,9 @@ const OrganizationDetailPageContent: React.FC = () => {
                 </Form.Item>
               </Col>
               <Col span={12}>
-                <Form.Item name="email" label="Email" rules={[{ type: 'email' }]}><Input /></Form.Item>
+                <Form.Item name="email" label="Email" rules={[{ type: 'email' }]}>
+                  <Input />
+                </Form.Item>
               </Col>
                <Col span={12}>
                 <Form.Item name="website" label="Website">
