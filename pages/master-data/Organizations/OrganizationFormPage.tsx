@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { App, Button, Card, Form, Input, Spin, Switch, Space, Row, Col } from 'antd';
+import { App, Button, Card, Form, Input, Spin, Switch, Space, Row, Col, Affix } from 'antd';
 import { SaveOutlined, CloseOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { organizationAPI } from '../../../utils/apiClient';
@@ -61,9 +61,9 @@ const OrganizationFormPage: React.FC = () => {
     };
 
     return (
-        <Card title={isEdit ? 'Edit Organization' : 'Create Organization'}>
-            <Spin spinning={loading}>
-                <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ is_active: true }}>
+        <Spin spinning={loading}>
+            <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ is_active: true }}>
+                <Card title={isEdit ? 'Edit Organization' : 'Create Organization'}>
                     {isEdit && (
                         <Row gutter={16}>
                             <Col xs={24} sm={12}>
@@ -134,24 +134,26 @@ const OrganizationFormPage: React.FC = () => {
                             <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
                         </Form.Item>
                     )}
-
-                    <Form.Item>
+                </Card>
+                
+                <Affix offsetBottom={0}>
+                    <Card className="mt-4 p-0 border-t">
                         <Row justify="end">
                             <Col>
                                 <Space>
-                                    <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>
-                                        {isEdit ? 'Save Changes' : 'Create Organization'}
-                                    </Button>
                                     <Button icon={<CloseOutlined />} onClick={() => navigate('/master-data/organizations')}>
                                         Cancel
+                                    </Button>
+                                    <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>
+                                        {isEdit ? 'Save Changes' : 'Create Organization'}
                                     </Button>
                                 </Space>
                             </Col>
                         </Row>
-                    </Form.Item>
-                </Form>
-            </Spin>
-        </Card>
+                    </Card>
+                </Affix>
+            </Form>
+        </Spin>
     );
 };
 

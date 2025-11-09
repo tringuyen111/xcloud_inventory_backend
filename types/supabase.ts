@@ -144,6 +144,15 @@ export type Database = {
         | "NONE"
         | "LOT"
         | "SERIAL"
+      location_goods_model_restriction_type_enum:
+        | "NONE"
+        | "ALLOWED_LIST"
+        | "DISALLOWED_LIST"
+      gr_type_enum:
+        | "STANDARD_PO"
+        | "RETURN"
+        | "TRANSFER"
+        | "OTHER"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -307,14 +316,11 @@ export type Database = {
           parent_id: string | null
           code: string
           name: string
-          location_type: string | null
-          zone_type: string | null
-          barcode: string | null
           is_active: boolean
-          is_pickable: boolean
-          is_receivable: boolean
           is_blocked: boolean
           description: string | null
+          goods_model_restriction_type: "NONE" | "ALLOWED_LIST" | "DISALLOWED_LIST"
+          restricted_goods_model_ids: string[] | null
         }
         Insert: {
           id?: string
@@ -322,14 +328,11 @@ export type Database = {
           parent_id?: string | null
           code?: string
           name: string
-          location_type?: string | null
-          zone_type?: string | null
-          barcode?: string | null
           is_active?: boolean
-          is_pickable?: boolean
-          is_receivable?: boolean
           is_blocked?: boolean
           description?: string | null
+          goods_model_restriction_type?: "NONE" | "ALLOWED_LIST" | "DISALLOWED_LIST"
+          restricted_goods_model_ids?: string[] | null
         }
         Update: {
           id?: string
@@ -337,14 +340,11 @@ export type Database = {
           parent_id?: string | null
           code?: string
           name?: string
-          location_type?: string | null
-          zone_type?: string | null
-          barcode?: string | null
           is_active?: boolean
-          is_pickable?: boolean
-          is_receivable?: boolean
           is_blocked?: boolean
           description?: string | null
+          goods_model_restriction_type?: "NONE" | "ALLOWED_LIST" | "DISALLOWED_LIST"
+          restricted_goods_model_ids?: string[] | null
         }
         Relationships: [
           {
@@ -771,6 +771,7 @@ export type Database = {
           code: string
           document_date: string | null
           status: "DRAFT" | "CREATED" | "RECEIVING" | "COMPLETED" | "CANCELLED"
+          gr_type: "STANDARD_PO" | "RETURN" | "TRANSFER" | "OTHER"
           notes: string | null
           created_by: string | null
           created_at: string | null
@@ -783,6 +784,7 @@ export type Database = {
           code?: string
           document_date?: string | null
           status?: "DRAFT" | "CREATED" | "RECEIVING" | "COMPLETED" | "CANCELLED"
+          gr_type?: "STANDARD_PO" | "RETURN" | "TRANSFER" | "OTHER"
           notes?: string | null
           created_by?: string | null
           created_at?: string | null
@@ -795,6 +797,7 @@ export type Database = {
           code?: string
           document_date?: string | null
           status?: "DRAFT" | "CREATED" | "RECEIVING" | "COMPLETED" | "CANCELLED"
+          gr_type?: "STANDARD_PO" | "RETURN" | "TRANSFER" | "OTHER"
           notes?: string | null
           created_by?: string | null
           created_at?: string | null

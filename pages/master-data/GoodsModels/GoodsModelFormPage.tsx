@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { App, Button, Card, Form, Input, Spin, Switch, Space, Select, Row, Col, Radio } from 'antd';
+import { App, Button, Card, Form, Input, Spin, Switch, Space, Select, Row, Col, Affix } from 'antd';
 import { SaveOutlined, CloseOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { goodsModelAPI, goodsTypeAPI, uomAPI } from '../../../utils/apiClient';
@@ -87,82 +87,92 @@ const GoodsModelFormPage: React.FC = () => {
     const isReady = !profileLoading && (isEdit || !!profile);
 
     return (
-        <Card title={isEdit ? 'Edit Goods Model' : 'Create Goods Model'}>
-            <Spin spinning={loading || profileLoading}>
-                 {isReady ? (
-                    <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ is_active: true }}>
-                        <Row gutter={16}>
-                             {isEdit && (
+        <Spin spinning={loading || profileLoading}>
+            <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ is_active: true }}>
+                <Card title={isEdit ? 'Edit Goods Model' : 'Create Goods Model'}>
+                     {isReady ? (
+                        <>
+                            {isEdit && (
+                                <Form.Item name="code" label="Part Number (Code)">
+                                    <Input disabled />
+                                </Form.Item>
+                            )}
+
+                            <Row gutter={16}>
                                 <Col span={12}>
-                                    <Form.Item name="code" label="Part Number (Code)">
-                                        <Input disabled />
+                                    <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+                                        <Input />
                                     </Form.Item>
                                 </Col>
-                            )}
-                            <Col span={isEdit ? 12 : 24}>
-                                <Form.Item name="name" label="Name" rules={[{ required: true }]}>
-                                    <Input />
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                        <Row gutter={16}>
-                             <Col span={12}>
-                                <Form.Item name="sku" label="SKU / SAP Code">
-                                    <Input />
-                                </Form.Item>
-                            </Col>
-                            <Col span={12}>
-                                <Form.Item name="barcode" label="Barcode">
-                                    <Input />
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                         <Row gutter={16}>
-                             <Col span={12}>
-                                <Form.Item name="goods_type_id" label="Goods Type" rules={[{ required: true }]}>
-                                    <Select showSearch options={goodsTypes.map(gt => ({ value: gt.id, label: gt.name }))} />
-                                </Form.Item>
-                            </Col>
-                            <Col span={12}>
-                                <Form.Item name="base_uom_id" label="Base UoM" rules={[{ required: true }]}>
-                                    <Select showSearch options={uoms.map(u => ({ value: u.id, label: u.name }))} />
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                        <Row gutter={16}>
-                            <Col span={12}>
-                                <Form.Item name="tracking_type" label="Tracking Type" rules={[{ required: true }]}>
-                                    <Radio.Group options={TRACKING_TYPES} optionType="button" buttonStyle="solid" />
-                                </Form.Item>
-                            </Col>
-                             {isEdit && (
                                 <Col span={12}>
-                                    <Form.Item name="is_active" label="Status" valuePropName="checked">
-                                        <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+                                    <Form.Item name="name_en" label="Name (English)">
+                                        <Input />
                                     </Form.Item>
-                                </Col>
-                            )}
-                        </Row>
-                        <Form.Item>
-                            <Row justify="end">
-                                <Col>
-                                    <Space>
-                                        <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>
-                                            {isEdit ? 'Save Changes' : 'Create'}
-                                        </Button>
-                                        <Button icon={<CloseOutlined />} onClick={() => navigate('/master-data/goods-models')}>
-                                            Cancel
-                                        </Button>
-                                    </Space>
                                 </Col>
                             </Row>
-                        </Form.Item>
-                    </Form>
-                 ) : (
-                    <div className="text-center p-8">Loading user and organization context...</div>
-                )}
-            </Spin>
-        </Card>
+                            <Row gutter={16}>
+                                 <Col span={24}>
+                                    <Form.Item name="sku" label="SKU / SAP Code">
+                                        <Input />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                             <Row gutter={16}>
+                                 <Col span={12}>
+                                    <Form.Item name="goods_type_id" label="Goods Type" rules={[{ required: true }]}>
+                                        <Select showSearch options={goodsTypes.map(gt => ({ value: gt.id, label: gt.name }))} />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item name="base_uom_id" label="Base UoM" rules={[{ required: true }]}>
+                                        <Select showSearch options={uoms.map(u => ({ value: u.id, label: u.name }))} />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                             <Row gutter={16}>
+                                <Col span={12}>
+                                    <Form.Item name="tracking_type" label="Tracking Type" rules={[{ required: true }]}>
+                                        <Select options={TRACKING_TYPES} />
+                                    </Form.Item>
+                                </Col>
+                                 {isEdit && (
+                                    <Col span={12}>
+                                        <Form.Item name="is_active" label="Status" valuePropName="checked">
+                                            <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+                                        </Form.Item>
+                                    </Col>
+                                )}
+                            </Row>
+                             <Row gutter={16}>
+                                <Col span={24}>
+                                    <Form.Item name="description" label="Description">
+                                        <Input.TextArea rows={3} />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                        </>
+                     ) : (
+                        <div className="text-center p-8">Loading user and organization context...</div>
+                    )}
+                </Card>
+                <Affix offsetBottom={0}>
+                    <Card className="mt-4 p-0 border-t">
+                        <Row justify="end">
+                            <Col>
+                                <Space>
+                                    <Button icon={<CloseOutlined />} onClick={() => navigate('/master-data/goods-models')}>
+                                        Cancel
+                                    </Button>
+                                    <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>
+                                        {isEdit ? 'Save Changes' : 'Create'}
+                                    </Button>
+                                </Space>
+                            </Col>
+                        </Row>
+                    </Card>
+                </Affix>
+            </Form>
+        </Spin>
     );
 };
 

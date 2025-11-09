@@ -18,6 +18,7 @@ type Warehouse = Database['master']['Tables']['warehouses']['Row'];
 type Partner = Database['master']['Tables']['partners']['Row'];
 
 const GR_STATUSES: GoodsReceipt['status'][] = ['DRAFT', 'CREATED', 'RECEIVING', 'COMPLETED', 'CANCELLED'];
+const GR_TYPES: GoodsReceipt['gr_type'][] = ['STANDARD_PO', 'RETURN', 'TRANSFER', 'OTHER'];
 
 const getStatusColor = (status: GoodsReceipt['status']) => {
   switch (status) {
@@ -38,6 +39,7 @@ const GRListPage: React.FC = () => {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [warehouseFilter, setWarehouseFilter] = useState<string[]>([]);
   const [supplierFilter, setSupplierFilter] = useState<string[]>([]);
   const [dateFilter, setDateFilter] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
@@ -60,6 +62,7 @@ const GRListPage: React.FC = () => {
     },
     { title: 'Warehouse', dataIndex: 'warehouse_id', key: 'warehouse_id', render: (id: string) => warehousesMap.get(id) || 'N/A' },
     { title: 'Supplier', dataIndex: 'supplier_id', key: 'supplier_id', render: (id: string | null) => id ? suppliersMap.get(id) || 'N/A' : 'N/A' },
+    { title: 'Type', dataIndex: 'gr_type', key: 'gr_type', render: (type: string) => <Tag>{type}</Tag> },
     {
       title: 'Status',
       dataIndex: 'status',
@@ -113,6 +116,9 @@ const GRListPage: React.FC = () => {
     if (statusFilter.length > 0) {
         filtered = filtered.filter(item => statusFilter.includes(item.status));
     }
+    if (typeFilter.length > 0) {
+        filtered = filtered.filter(item => typeFilter.includes(item.gr_type));
+    }
     if (warehouseFilter.length > 0) {
         filtered = filtered.filter(item => warehouseFilter.includes(item.warehouse_id));
     }
@@ -127,7 +133,7 @@ const GRListPage: React.FC = () => {
         });
     }
     return filtered;
-  }, [debouncedSearchTerm, statusFilter, warehouseFilter, supplierFilter, dateFilter, allGrList]);
+  }, [debouncedSearchTerm, statusFilter, typeFilter, warehouseFilter, supplierFilter, dateFilter, allGrList]);
   
   const columnSelector = (
     <Dropdown
@@ -162,7 +168,7 @@ const GRListPage: React.FC = () => {
     >
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={8}>
+          <Col xs={24} sm={12} md={6}>
             <Input.Search 
               placeholder="Search by GR code..." 
               onSearch={setSearchTerm}
@@ -170,7 +176,17 @@ const GRListPage: React.FC = () => {
               allowClear
             />
           </Col>
-          <Col xs={24} sm={12} md={8}>
+          <Col xs={24} sm={12} md={6}>
+              <Select
+                  mode="multiple"
+                  allowClear
+                  style={{ width: '100%' }}
+                  placeholder="Filter by type..."
+                  onChange={setTypeFilter}
+                  options={GR_TYPES.map(type => ({ label: type, value: type }))}
+              />
+          </Col>
+          <Col xs={24} sm={12} md={6}>
               <Select
                   mode="multiple"
                   allowClear
@@ -180,10 +196,10 @@ const GRListPage: React.FC = () => {
                   options={GR_STATUSES.map(status => ({ label: status, value: status }))}
               />
           </Col>
-          <Col xs={24} sm={12} md={8}>
+          <Col xs={24} sm={12} md={6}>
             <RangePicker style={{ width: '100%' }} onChange={(dates) => setDateFilter(dates as any)} />
           </Col>
-          <Col xs={24} sm={12} md={8}>
+          <Col xs={24} sm={12} md={6}>
               <Select
                   mode="multiple"
                   allowClear
@@ -193,7 +209,7 @@ const GRListPage: React.FC = () => {
                   options={warehouses.map(w => ({ label: w.name, value: w.id }))}
               />
           </Col>
-          <Col xs={24} sm={12} md={8}>
+          <Col xs={24} sm={12} md={6}>
               <Select
                   mode="multiple"
                   allowClear

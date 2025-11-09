@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { App, Button, Card, Form, Input, Spin, Switch, Space, Checkbox, Row, Col } from 'antd';
+import { App, Button, Card, Form, Input, Spin, Switch, Space, Select, Row, Col, Affix } from 'antd';
 import { SaveOutlined, CloseOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { partnerAPI } from '../../../utils/apiClient';
@@ -25,13 +25,19 @@ const PartnerFormPage: React.FC = () => {
             setLoading(true);
             partnerAPI.get(id)
                 .then((data) => {
-                    if (data) form.setFieldsValue(data);
+                    if (data) {
+                        const partnerTypes = [];
+                        if (data.is_supplier) partnerTypes.push('is_supplier');
+                        if (data.is_customer) partnerTypes.push('is_customer');
+                        if (data.is_carrier) partnerTypes.push('is_carrier');
+                        form.setFieldsValue({ ...data, partner_types: partnerTypes });
+                    }
                 })
                 .catch(error => notification.error({ message: 'Error fetching partner', description: error.message }))
                 .finally(() => setLoading(false));
         } else {
             form.resetFields();
-            form.setFieldsValue({ is_supplier: false, is_customer: false, is_carrier: false, is_active: true });
+            form.setFieldsValue({ is_active: true });
         }
     }, [id, form, notification]);
 
@@ -42,13 +48,15 @@ const PartnerFormPage: React.FC = () => {
         }
         setLoading(true);
         
+        const partnerTypes: string[] = values.partner_types || [];
         const payload = {
             ...values,
             organization_id: profile.organization_uuid,
-            is_supplier: !!values.is_supplier,
-            is_customer: !!values.is_customer,
-            is_carrier: !!values.is_carrier,
+            is_supplier: partnerTypes.includes('is_supplier'),
+            is_customer: partnerTypes.includes('is_customer'),
+            is_carrier: partnerTypes.includes('is_carrier'),
         };
+        delete payload.partner_types;
 
         try {
             if (isEdit) {
@@ -69,33 +77,28 @@ const PartnerFormPage: React.FC = () => {
     const isReady = !profileLoading && (isEdit || !!profile);
 
     return (
-        <Card title={isEdit ? 'Edit Partner' : 'Create Partner'}>
-            <Spin spinning={loading || profileLoading}>
-                {isReady ? (
-                    <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ is_active: true }}>
-                        <Card title="Classification" style={{ marginBottom: 16 }}>
-                             <Row gutter={16}>
+        <Spin spinning={loading || profileLoading}>
+            <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ is_active: true }}>
+                <Card title={isEdit ? 'Edit Partner' : 'Create Partner'}>
+                    {isReady ? (
+                        <>
+                            <Row gutter={16}>
                                 <Col span={24}>
-                                    <Form.Item label="Partner Type">
-                                        <Space>
-                                            <Form.Item name="is_supplier" valuePropName="checked" noStyle><Checkbox>Supplier</Checkbox></Form.Item>
-                                            <Form.Item name="is_customer" valuePropName="checked" noStyle><Checkbox>Customer</Checkbox></Form.Item>
-                                            <Form.Item name="is_carrier" valuePropName="checked" noStyle><Checkbox>Carrier</Checkbox></Form.Item>
-                                        </Space>
+                                    <Form.Item name="partner_types" label="Partner Type" rules={[{ required: true, message: 'Please select at least one partner type!' }]}>
+                                        <Select
+                                            mode="multiple"
+                                            allowClear
+                                            placeholder="Select partner types"
+                                            options={[
+                                                { label: 'Supplier', value: 'is_supplier' },
+                                                { label: 'Customer', value: 'is_customer' },
+                                                { label: 'Carrier', value: 'is_carrier' },
+                                            ]}
+                                        />
                                     </Form.Item>
                                 </Col>
                             </Row>
-                        </Card>
-                        
-                        <Card title="General Information" style={{ marginBottom: 16 }}>
                             <Row gutter={16}>
-                                {isEdit && (
-                                    <Col span={12}>
-                                        <Form.Item name="code" label="Code">
-                                            <Input disabled />
-                                        </Form.Item>
-                                    </Col>
-                                )}
                                 <Col span={12}>
                                     <Form.Item name="name" label="Name" rules={[{ required: true }]}>
                                         <Input placeholder="Partner's common name" />
@@ -107,9 +110,6 @@ const PartnerFormPage: React.FC = () => {
                                     </Form.Item>
                                 </Col>
                             </Row>
-                        </Card>
-
-                        <Card title="Contact Details" style={{ marginBottom: 16 }}>
                             <Row gutter={16}>
                                 <Col span={12}>
                                     <Form.Item name="phone" label="Phone">
@@ -134,36 +134,44 @@ const PartnerFormPage: React.FC = () => {
                                     </Form.Item>
                                 </Col>
                             </Row>
-                        </Card>
+                            {isEdit && (
+                                <Row gutter={16}>
+                                    <Col span={12}>
+                                        <Form.Item name="code" label="Partner Code">
+                                            <Input disabled />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col span={12}>
+                                        <Form.Item name="is_active" label="Status" valuePropName="checked">
+                                            <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+                            )}
+                        </>
+                    ) : (
+                        <div className="text-center p-8">Loading user and organization context...</div>
+                    )}
+                </Card>
 
-                        {isEdit && (
-                            <Card title="Status" style={{ marginBottom: 16 }}>
-                                <Form.Item name="is_active" label="Active Status" valuePropName="checked">
-                                    <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
-                                </Form.Item>
-                            </Card>
-                        )}
-                        
-                        <Form.Item>
-                            <Row justify="end">
-                                <Col>
-                                    <Space>
-                                        <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>
-                                            {isEdit ? 'Save Changes' : 'Create'}
-                                        </Button>
-                                        <Button icon={<CloseOutlined />} onClick={() => navigate('/master-data/partners')}>
-                                            Cancel
-                                        </Button>
-                                    </Space>
-                                </Col>
-                            </Row>
-                        </Form.Item>
-                    </Form>
-                ) : (
-                    <div className="text-center p-8">Loading user and organization context...</div>
-                )}
-            </Spin>
-        </Card>
+                <Affix offsetBottom={0}>
+                    <Card className="mt-4 p-0 border-t">
+                        <Row justify="end">
+                            <Col>
+                                <Space>
+                                    <Button icon={<CloseOutlined />} onClick={() => navigate('/master-data/partners')}>
+                                        Cancel
+                                    </Button>
+                                    <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>
+                                        {isEdit ? 'Save Changes' : 'Create'}
+                                    </Button>
+                                </Space>
+                            </Col>
+                        </Row>
+                    </Card>
+                </Affix>
+            </Form>
+        </Spin>
     );
 };
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { App, Button, Card, Form, Input, Spin, Switch, Space, Select, Row, Col } from 'antd';
+import { App, Button, Card, Form, Input, Spin, Switch, Space, Select, Row, Col, Affix } from 'antd';
 import { SaveOutlined, CloseOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { branchAPI, organizationAPI } from '../../../utils/apiClient';
@@ -64,9 +64,9 @@ const BranchFormPage: React.FC = () => {
     };
 
     return (
-        <Card title={isEdit ? 'Edit Branch' : 'Create Branch'}>
-            <Spin spinning={loading}>
-                <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ is_active: true }}>
+        <Spin spinning={loading}>
+            <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ is_active: true }}>
+                <Card title={isEdit ? 'Edit Branch' : 'Create Branch'}>
                      {isEdit && (
                         <Row gutter={16}>
                             <Col xs={24} sm={12}>
@@ -147,24 +147,25 @@ const BranchFormPage: React.FC = () => {
                             <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
                         </Form.Item>
                     )}
-
-                    <Form.Item>
+                </Card>
+                <Affix offsetBottom={0}>
+                    <Card className="mt-4 p-0 border-t">
                         <Row justify="end">
                             <Col>
                                 <Space>
-                                    <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>
-                                        {isEdit ? 'Save Changes' : 'Create Branch'}
-                                    </Button>
                                     <Button icon={<CloseOutlined />} onClick={() => navigate('/master-data/branches')}>
                                         Cancel
+                                    </Button>
+                                    <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>
+                                        {isEdit ? 'Save Changes' : 'Create Branch'}
                                     </Button>
                                 </Space>
                             </Col>
                         </Row>
-                    </Form.Item>
-                </Form>
-            </Spin>
-        </Card>
+                    </Card>
+                </Affix>
+            </Form>
+        </Spin>
     );
 };
 

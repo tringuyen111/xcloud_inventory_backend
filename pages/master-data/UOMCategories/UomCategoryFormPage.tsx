@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { App, Button, Card, Form, Input, Spin, Switch, Space, Row, Col } from 'antd';
+import { App, Button, Card, Form, Input, Spin, Switch, Space, Row, Col, Affix } from 'antd';
 import { SaveOutlined, CloseOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { uomCategoryAPI } from '../../../utils/apiClient';
@@ -64,63 +64,67 @@ const UomCategoryFormPage: React.FC = () => {
     const isReady = !profileLoading && (isEdit || !!profile);
 
     return (
-        <Card title={isEdit ? 'Edit UoM Category' : 'Create UoM Category'}>
-            <Spin spinning={loading || profileLoading}>
-                {isReady ? (
-                    <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ is_active: true }}>
-                        <Row gutter={16}>
-                            {isEdit && (
-                                <Col xs={24} sm={12}>
-                                    <Form.Item name="code" label="Code">
-                                        <Input disabled />
+        <Spin spinning={loading || profileLoading}>
+             <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ is_active: true }}>
+                <Card title={isEdit ? 'Edit UoM Category' : 'Create UoM Category'}>
+                    {isReady ? (
+                        <>
+                            <Row gutter={16}>
+                                <Col span={12}>
+                                    <Form.Item name="name" label="Name (Vietnamese)" rules={[{ required: true }]}>
+                                        <Input />
                                     </Form.Item>
                                 </Col>
-                            )}
-                            <Col xs={24} sm={isEdit ? 12 : 24}>
-                                <Form.Item name="name" label="Name (Vietnamese)" rules={[{ required: true }]}>
-                                    <Input />
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                        <Row gutter={16}>
-                             <Col xs={24} sm={12}>
-                                <Form.Item name="name_en" label="Name (English)">
-                                    <Input />
-                                </Form.Item>
-                            </Col>
-                             {isEdit && (
-                                <Col xs={24} sm={12}>
-                                    <Form.Item name="is_active" label="Status" valuePropName="checked">
-                                        <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+                                <Col span={12}>
+                                    <Form.Item name="name_en" label="Name (English)">
+                                        <Input />
                                     </Form.Item>
-                                </Col>
-                            )}
-                        </Row>
-                        
-                        <Form.Item name="description" label="Description">
-                            <Input.TextArea rows={3} />
-                        </Form.Item>
-                        
-                        <Form.Item>
-                            <Row justify="end">
-                                <Col>
-                                    <Space>
-                                        <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>
-                                            {isEdit ? 'Save Changes' : 'Create'}
-                                        </Button>
-                                        <Button icon={<CloseOutlined />} onClick={() => navigate('/master-data/uom-categories')}>
-                                            Cancel
-                                        </Button>
-                                    </Space>
                                 </Col>
                             </Row>
-                        </Form.Item>
-                    </Form>
-                ) : (
-                    <div className="text-center p-8">Loading user and organization context...</div>
-                )}
-            </Spin>
-        </Card>
+
+                            <Row gutter={16}>
+                                {isEdit && (
+                                    <>
+                                     <Col xs={24} sm={12}>
+                                        <Form.Item name="code" label="Code">
+                                            <Input disabled />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12}>
+                                        <Form.Item name="is_active" label="Status" valuePropName="checked">
+                                            <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+                                        </Form.Item>
+                                    </Col>
+                                    </>
+                                )}
+                            </Row>
+                            
+                            <Form.Item name="description" label="Description">
+                                <Input.TextArea rows={3} />
+                            </Form.Item>
+                        </>
+                    ) : (
+                        <div className="text-center p-8">Loading user and organization context...</div>
+                    )}
+                </Card>
+                <Affix offsetBottom={0}>
+                    <Card className="mt-4 p-0 border-t">
+                        <Row justify="end">
+                            <Col>
+                                <Space>
+                                    <Button icon={<CloseOutlined />} onClick={() => navigate('/master-data/uom-categories')}>
+                                        Cancel
+                                    </Button>
+                                    <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>
+                                        {isEdit ? 'Save Changes' : 'Create'}
+                                    </Button>
+                                </Space>
+                            </Col>
+                        </Row>
+                    </Card>
+                </Affix>
+            </Form>
+        </Spin>
     );
 };
 

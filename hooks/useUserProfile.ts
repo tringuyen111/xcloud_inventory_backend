@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, masterDataClient } from '../lib/supabase'; // Import the new client
 import useAuthStore from '../stores/authStore';
 import { Database } from '../types/supabase';
 
@@ -28,31 +28,45 @@ export function useUserProfile() {
       setLoading(true);
       setError(null);
       try {
-        // Fetch both the user's profile and the first available organization's UUID in parallel.
-        // This is a robust workaround for the BIGINT vs UUID discrepancy in the schema.
-        const [userProfileRes, orgRes] = await Promise.all([
-          supabase.from('users').select('*').eq('id', user.id).single(),
-          supabase.from('organizations').select('id').limit(1).single()
-        ]);
+        // First, fetch the user's base profile from the public.users table.
+        const { data: userProfileData, error: userProfileError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single();
 
-        if (userProfileRes.error) {
-          if (userProfileRes.error.code === 'PGRST116') throw new Error("User profile not found in public.users.");
-          throw userProfileRes.error;
+        if (userProfileError) {
+          if (userProfileError.code === 'PGRST116') throw new Error("User profile not found in public.users.");
+          throw userProfileError;
         }
 
-        if (orgRes.error) {
-          if (orgRes.error.code === 'PGRST116') throw new Error("No organizations found in master.organizations. Cannot determine user's organization UUID.");
-          throw orgRes.error;
-        }
+        let organization_uuid: string | null = null;
         
-        const userProfileData = userProfileRes.data;
-        const organization_uuid = orgRes.data?.id || null;
+        // Then, attempt to fetch the organization UUID. This might fail due to RLS.
+        // Instead of throwing a fatal error, we'll handle it gracefully.
+        const { data: orgData, error: orgError } = await masterDataClient
+          .from('organizations')
+          .select('id')
+          .limit(1)
+          .single();
+        
+        if (orgError) {
+          // Log a warning for debugging but don't crash the app.
+          const warningMessage = "No organizations found in master.organizations. Cannot determine user's organization UUID. This is likely an RLS policy issue or an empty table.";
+          console.warn(`Warning in useUserProfile: ${warningMessage} (Supabase error: ${orgError.message})`);
+          setError(warningMessage); // Set error state for components to optionally display.
+        } else if (orgData) {
+          organization_uuid = orgData.id;
+        }
 
-        // Combine the data into the new augmented profile object
-        setProfile({ ...userProfileData, organization_uuid });
+        // Combine the data into the new augmented profile object.
+        if (userProfileData) {
+          setProfile({ ...userProfileData, organization_uuid });
+        }
 
       } catch (err: any) {
-        console.error('Error fetching user profile and organization:', err);
+        // This will now primarily catch errors from the user profile fetch.
+        console.error('Error fetching user profile:', err);
         setError(err.message);
         setProfile(null);
       } finally {
