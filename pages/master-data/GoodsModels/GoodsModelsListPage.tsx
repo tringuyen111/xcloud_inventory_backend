@@ -1,293 +1,207 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../lib/supabase';
-import { GoodsModel, GoodsType, Uom } from '../../../types/supabase';
-import {
-    Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Modal, Form, Dropdown, Menu, Typography, DatePicker, Checkbox
-} from 'antd';
+import React, { useEffect, useState, useMemo } from 'react';
+import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, Dropdown, Menu, Checkbox } from 'antd';
+import { EyeOutlined, PlusOutlined, EditOutlined, FileExcelOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import {
-    PlusOutlined, ExportOutlined, ProfileOutlined, EllipsisOutlined, EyeOutlined, EditOutlined, DeleteOutlined, DownOutlined
-} from '@ant-design/icons';
-import useAuthStore from '../../../stores/authStore';
-import type { TableProps } from 'antd';
-import type { Dayjs } from 'dayjs';
+import { useDebounce } from '../../../hooks/useDebounce';
+import { goodsModelAPI, goodsTypeAPI, uomAPI } from '../../../utils/apiClient';
+// FIX: Import Supabase Database types to correctly type API responses.
+import { Database } from '../../../types/supabase';
 
-const { Title, Text } = Typography;
-const { RangePicker } = DatePicker;
+// FIX: Define types for related data to ensure type safety.
+type GoodsType = Database['master']['Tables']['goods_types']['Row'];
+type Uom = Database['master']['Tables']['uoms']['Row'];
 
-type GoodsModelWithDetails = GoodsModel & { 
-    goods_types: { name: string } | null;
-    uoms: { name: string } | null;
-};
+interface GoodsModel {
+  id: string;
+  code: string;
+  name: string;
+  sku: string;
+  goods_type_id: string;
+  base_uom_id: string;
+  tracking_type: string;
+  is_active: boolean;
+}
 
-const TRACKING_TYPES: GoodsModel['tracking_type'][] = ['NONE', 'LOT', 'SERIAL'];
-
-const defaultColumns: TableProps<GoodsModelWithDetails>['columns'] = [
-    { title: 'Code', dataIndex: 'code', key: 'code', sorter: (a, b) => a.code.localeCompare(b.code) },
-    { title: 'Name', dataIndex: 'name', key: 'name', sorter: (a, b) => a.name.localeCompare(b.name)},
-    { title: 'Goods Type', dataIndex: ['goods_types', 'name'], key: 'goods_type', sorter: (a, b) => (a.goods_types?.name || '').localeCompare(b.goods_types?.name || '') },
-    { title: 'Base UoM', dataIndex: ['uoms', 'name'], key: 'base_uom', sorter: (a, b) => (a.uoms?.name || '').localeCompare(b.uoms?.name || '') },
-    { title: 'Tracking', dataIndex: 'tracking_type', key: 'tracking_type', render: (type: string) => <Tag>{type}</Tag> },
-    { title: 'Status', dataIndex: 'is_active', key: 'is_active', render: (isActive: boolean) => <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'Active' : 'Inactive'}</Tag> },
-    {
-        title: 'Actions',
-        key: 'action',
-        align: 'center' as const,
-        render: () => <EllipsisOutlined />,
-    },
-];
+const TRACKING_TYPES = ['NONE', 'LOT', 'SERIAL'];
 
 const GoodsModelsListPage: React.FC = () => {
-    const [goodsModels, setGoodsModels] = useState<GoodsModelWithDetails[]>([]);
-    const [loading, setLoading] = useState(true);
-    const { notification, modal } = App.useApp();
-    const navigate = useNavigate();
-    const [form] = Form.useForm();
-    const user = useAuthStore((state) => state.user);
-    
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [goodsTypes, setGoodsTypes] = useState<GoodsType[]>([]);
-    const [uoms, setUoms] = useState<Uom[]>([]);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState<string>('all');
-    const [goodsTypeFilter, setGoodsTypeFilter] = useState<number | null>(null);
-    const [trackingTypeFilter, setTrackingTypeFilter] = useState<string | null>(null);
-    const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
-    const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
+  const [allModels, setAllModels] = useState<GoodsModel[]>([]);
+  const [filteredModels, setFilteredModels] = useState<GoodsModel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [goodsTypes, setGoodsTypes] = useState<{ id: string, name: string }[]>([]);
+  const [uoms, setUoms] = useState<{ id: string, name: string }[]>([]);
 
-    const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns.map(c => c.key as string));
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<boolean | null>(null);
+  const [goodsTypeFilter, setGoodsTypeFilter] = useState<string[]>([]);
+  const [trackingTypeFilter, setTrackingTypeFilter] = useState<string[]>([]);
+  
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const navigate = useNavigate();
+  const { notification } = App.useApp();
 
+  const goodsTypesMap = useMemo(() => new Map(goodsTypes.map(gt => [gt.id, gt.name])), [goodsTypes]);
+  const uomsMap = useMemo(() => new Map(uoms.map(u => [u.id, u.name])), [uoms]);
 
-    const fetchData = useCallback(async (page: number, pageSize: number) => {
-        setLoading(true);
-        try {
-            let query = supabase.from('goods_models').select('*, goods_types(name), uoms(name)', { count: 'exact' });
-            if (searchTerm) query = query.or(`name.ilike.%${searchTerm}%,code.ilike.%${searchTerm}%`);
-            if (statusFilter !== 'all') query = query.eq('is_active', statusFilter === 'active');
-            if (goodsTypeFilter) query = query.eq('goods_type_id', goodsTypeFilter);
-            if (trackingTypeFilter) query = query.eq('tracking_type', trackingTypeFilter);
-            if (dateRange && dateRange[0]) query = query.gte('updated_at', dateRange[0].startOf('day').toISOString());
-            if (dateRange && dateRange[1]) query = query.lte('updated_at', dateRange[1].endOf('day').toISOString());
-            
-            const { data, error, count } = await query
-                .order('name', { ascending: true })
-                .range((page - 1) * pageSize, page * pageSize - 1);
+  const columns = useMemo(() => [
+    { title: 'Code', dataIndex: 'code', key: 'code', sorter: (a: GoodsModel, b: GoodsModel) => a.code.localeCompare(b.code) },
+    { title: 'Name', dataIndex: 'name', key: 'name', sorter: (a: GoodsModel, b: GoodsModel) => a.name.localeCompare(b.name) },
+    { title: 'SKU', dataIndex: 'sku', key: 'sku' },
+    { title: 'Goods Type', dataIndex: 'goods_type_id', key: 'goods_type_id', render: (id: string) => goodsTypesMap.get(id) || id },
+    { title: 'Base UoM', dataIndex: 'base_uom_id', key: 'base_uom_id', render: (id: string) => uomsMap.get(id) || id },
+    { title: 'Tracking', dataIndex: 'tracking_type', key: 'tracking_type', render: (type: string) => <Tag>{type}</Tag> },
+    {
+      title: 'Status',
+      dataIndex: 'is_active',
+      key: 'is_active',
+      render: (isActive: boolean) => <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'ACTIVE' : 'INACTIVE'}</Tag>,
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, record: GoodsModel) => (
+        <Space size="middle">
+          <Tooltip title="View Details"><Button icon={<EyeOutlined />} onClick={() => navigate(`/master-data/goods-models/${record.id}`)} /></Tooltip>
+          <Tooltip title="Edit"><Button icon={<EditOutlined />} onClick={() => navigate(`/master-data/goods-models/${record.id}/edit`)} /></Tooltip>
+        </Space>
+      ),
+    },
+  ], [navigate, goodsTypesMap, uomsMap]);
+  
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => columns.map(c => c.key as string));
 
-            if (error) throw error;
-            setGoodsModels(data as GoodsModelWithDetails[] || []);
-            setPagination(prev => ({...prev, total: count || 0 }));
-        } catch (error: any) {
-            notification.error({ message: "Error fetching goods models", description: error.message });
-        } finally {
-            setLoading(false);
-        }
-    }, [notification, searchTerm, statusFilter, goodsTypeFilter, trackingTypeFilter, dateRange]);
-    
-    const fetchDropdownData = useCallback(async () => {
-        try {
-            const [typesRes, uomsRes] = await Promise.all([
-                supabase.from('goods_types').select('id, name').eq('is_active', true),
-                supabase.from('uoms').select('id, name').eq('is_active', true)
-            ]);
-            if (typesRes.error) throw typesRes.error;
-            if (uomsRes.error) throw uomsRes.error;
-            setGoodsTypes(typesRes.data || []);
-            setUoms(uomsRes.data || []);
-        } catch (error: any) {
-             notification.error({ message: "Error fetching related data", description: error.message });
-        }
-    }, [notification]);
-
-    useEffect(() => {
-        fetchData(pagination.current, pagination.pageSize);
-    }, [fetchData, pagination.current, pagination.pageSize]);
-    
-    useEffect(() => {
-        fetchDropdownData();
-    }, [fetchDropdownData]);
-    
-    const handleTableChange = (paginationConfig: any) => {
-        setPagination(prev => ({ ...prev, ...paginationConfig }));
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [modelData, goodsTypeData, uomData] = await Promise.all([
+            goodsModelAPI.list(),
+            goodsTypeAPI.list(),
+            uomAPI.list()
+        ]);
+        setAllModels(modelData as GoodsModel[]);
+        // FIX: Cast API responses to the correct types before mapping to avoid errors.
+        setGoodsTypes((goodsTypeData as GoodsType[]).map(g => ({ id: g.id, name: g.name })));
+        setUoms((uomData as Uom[]).map(u => ({ id: u.id, name: u.name })));
+      } catch (error: any) {
+        notification.error({ message: 'Error fetching goods models', description: error.message });
+      } finally {
+        setLoading(false);
+      }
     };
+    fetchData();
+  }, [notification]);
 
-    const handleCreate = () => {
-        form.resetFields();
-        setIsModalOpen(true);
-    };
+  useEffect(() => {
+    let filtered = [...allModels];
+    if (debouncedSearchTerm) {
+      const lowercasedFilter = debouncedSearchTerm.toLowerCase();
+      filtered = filtered.filter(item =>
+        item.code.toLowerCase().includes(lowercasedFilter) ||
+        item.name.toLowerCase().includes(lowercasedFilter) ||
+        (item.sku && item.sku.toLowerCase().includes(lowercasedFilter))
+      );
+    }
+    if (statusFilter !== null) {
+        filtered = filtered.filter(item => item.is_active === statusFilter);
+    }
+    if (goodsTypeFilter.length > 0) {
+        filtered = filtered.filter(item => goodsTypeFilter.includes(item.goods_type_id));
+    }
+    if (trackingTypeFilter.length > 0) {
+        filtered = filtered.filter(item => trackingTypeFilter.includes(item.tracking_type));
+    }
+    setFilteredModels(filtered);
+  }, [debouncedSearchTerm, statusFilter, goodsTypeFilter, trackingTypeFilter, allModels]);
 
-    const handleCancel = () => setIsModalOpen(false);
-
-    const handleSave = async () => {
-        try {
-            setIsSaving(true);
-            const values = await form.validateFields();
-            const { error } = await supabase.from('goods_models').insert({ ...values, created_by: user?.id, updated_by: user?.id }).select();
-            if (error) throw error;
-            notification.success({ message: "Goods Model created successfully" });
-            setIsModalOpen(false);
-            fetchData(1, pagination.pageSize);
-            setPagination(p=>({...p, current:1}));
-        } catch (error: any) {
-            notification.error({ message: "Failed to create Goods Model", description: error.message });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleDelete = (id: number) => {
-        modal.confirm({
-            title: 'Are you sure you want to delete this goods model?',
-            content: 'This action cannot be undone.',
-            okText: 'Yes, delete it',
-            okType: 'danger',
-            onOk: async () => {
-                try {
-                    const { error } = await supabase.from('goods_models').delete().eq('id', id);
-                    if (error) throw error;
-                    notification.success({ message: 'Goods Model deleted successfully' });
-                    fetchData(pagination.current, pagination.pageSize);
-                } catch (error: any) {
-                    notification.error({ message: 'Failed to delete Goods Model', description: error.message });
-                }
-            },
-        });
-    };
-    
-    const exportToCsv = (filename: string, data: GoodsModelWithDetails[]) => {
-        const visibleCols = defaultColumns.filter(c => visibleColumns.includes(c.key as string) && c.key !== 'action');
-        const header = visibleCols.map(c => c.title).join(',');
-        const rows = data.map(row => 
-            visibleCols.map(col => {
-                let value;
-                if (Array.isArray(col.dataIndex)) {
-                     value = col.dataIndex.reduce((obj, key) => (obj && obj[key] !== 'undefined') ? obj[key] : '', row);
-                } else {
-                    value = row[col.dataIndex as keyof GoodsModelWithDetails];
-                }
-                if (value === null || value === undefined) return '';
-                if (typeof value === 'boolean') return value ? 'Active' : 'Inactive';
-                return `"${String(value).replace(/"/g, '""')}"`;
-            }).join(',')
-        );
-        const csv = [header, ...rows].join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute('download', filename);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    const columnsMenu = (
+  const columnSelector = (
+    <Dropdown
+      overlay={
         <Menu>
-            {defaultColumns
-                .filter(c => c.key !== 'action')
-                .map(col => {
-                    const key = col.key as string;
-                    return (
-                        <Menu.Item key={key} onClick={(e) => e.domEvent.stopPropagation()}>
-                            <Checkbox
-                                checked={visibleColumns.includes(key)}
-                                onChange={(e) => {
-                                    const checked = e.target.checked;
-                                    if (checked) {
-                                        setVisibleColumns(prev => [...prev, key]);
-                                    } else {
-                                        if (visibleColumns.filter(k => k !== 'action').length > 1) {
-                                            setVisibleColumns(prev => prev.filter(k => k !== key));
-                                        } else {
-                                            notification.warning({ message: "At least one column must be visible."});
-                                        }
-                                    }
-                                }}
-                            >
-                                {col.title as string}
-                            </Checkbox>
-                        </Menu.Item>
-                    )
-                })
-            }
+          <Checkbox.Group
+            className="flex flex-col p-2"
+            options={columns.map(({ key, title }) => ({ label: title as string, value: key as string }))}
+            value={visibleColumns}
+            onChange={(values) => setVisibleColumns(values as string[])}
+          />
         </Menu>
-    );
+      }
+      trigger={['click']}
+    >
+      <Button icon={<EyeOutlined />}>Columns</Button>
+    </Dropdown>
+  );
 
-    const getColumns = () => {
-        const actionMenu = (record: GoodsModel) => (
-            <Menu>
-                <Menu.Item key="1" icon={<EyeOutlined />} onClick={() => navigate(`/master-data/goods-models/${record.id}`)}>View</Menu.Item>
-                <Menu.Item key="2" icon={<EditOutlined />} onClick={() => navigate(`/master-data/goods-models/${record.id}`)}>Edit</Menu.Item>
-                <Menu.Divider />
-                <Menu.Item key="3" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)}>Delete</Menu.Item>
-            </Menu>
-        );
-        const cols = [...defaultColumns];
-        const actionCol = cols.find(c => c.key === 'action');
-        if (actionCol) {
-            actionCol.render = (_: any, record: GoodsModel) => (
-                 <Dropdown overlay={actionMenu(record)} trigger={['click']}>
-                    <Button type="text" icon={<EllipsisOutlined />} />
-                </Dropdown>
-            );
+  return (
+    <Card
+        title="Goods Models"
+        extra={
+          <Space>
+            {columnSelector}
+            <Button icon={<FileExcelOutlined />}>Export</Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/goods-models/create')}>
+                Create
+            </Button>
+          </Space>
         }
-        return cols.filter(c => visibleColumns.includes(c.key as string));
-    };
-
-    return (
-        <Card>
-            <Row justify="space-between" align="middle" className="mb-4">
-                <Col>
-                    <Title level={4} style={{ margin: 0 }}>Goods Models</Title>
-                    <Text type="secondary">Manage all goods models (SKUs) in the system.</Text>
+      >
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12} md={8}>
+                    <Input.Search 
+                        placeholder="Search by code, name, or SKU..." 
+                        onSearch={setSearchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        allowClear
+                    />
                 </Col>
-                <Col>
-                    <Space>
-                        <Button icon={<ExportOutlined />} onClick={() => exportToCsv('goods_models.csv', goodsModels)}>Export</Button>
-                        <Dropdown overlay={columnsMenu} trigger={['click']}>
-                            <Button icon={<ProfileOutlined />}>
-                                Columns <DownOutlined />
-                            </Button>
-                        </Dropdown>
-                        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>Add New</Button>
-                    </Space>
+                <Col xs={24} sm={12} md={8}>
+                    <Select
+                        allowClear
+                        style={{ width: '100%' }}
+                        placeholder="Filter by status..."
+                        onChange={(value) => setStatusFilter(value === undefined ? null : value)}
+                        options={[
+                            { label: 'Active', value: true },
+                            { label: 'Inactive', value: false },
+                        ]}
+                    />
+                </Col>
+                 <Col xs={24} sm={12} md={8}>
+                    <Select
+                        mode="multiple"
+                        allowClear
+                        style={{ width: '100%' }}
+                        placeholder="Filter by Goods Type..."
+                        onChange={setGoodsTypeFilter}
+                        options={goodsTypes.map(gt => ({ label: gt.name, value: gt.id }))}
+                    />
+                </Col>
+                <Col xs={24} sm={12} md={8}>
+                    <Select
+                        mode="multiple"
+                        allowClear
+                        style={{ width: '100%' }}
+                        placeholder="Filter by Tracking Type..."
+                        onChange={setTrackingTypeFilter}
+                        options={TRACKING_TYPES.map(t => ({ label: t, value: t }))}
+                    />
                 </Col>
             </Row>
-
-             <div className="p-4 mb-6 bg-gray-50 rounded-lg">
-                <Row gutter={[16,16]} align="bottom">
-                    <Col><Form.Item label="Search" style={{ marginBottom: 0 }}><Input.Search placeholder="Search by name or code..." onSearch={val=>{setSearchTerm(val); setPagination(p=>({...p, current:1}));}} allowClear style={{width: 250}} /></Form.Item></Col>
-                    <Col><Form.Item label="Goods Type" style={{ marginBottom: 0 }}><Select allowClear placeholder="All Types" value={goodsTypeFilter} onChange={val=>{setGoodsTypeFilter(val); setPagination(p=>({...p, current:1}));}} style={{ width: 150 }} options={goodsTypes.map(o => ({label: o.name, value: o.id}))} /></Form.Item></Col>
-                    <Col><Form.Item label="Tracking" style={{ marginBottom: 0 }}><Select allowClear placeholder="All Tracking" value={trackingTypeFilter} onChange={val=>{setTrackingTypeFilter(val); setPagination(p=>({...p, current:1}));}} style={{ width: 150 }} options={TRACKING_TYPES.map(o => ({label: o, value: o}))} /></Form.Item></Col>
-                    <Col><Form.Item label="Status" style={{ marginBottom: 0 }}><Select value={statusFilter} onChange={val=>{setStatusFilter(val); setPagination(p=>({...p, current:1}));}} style={{ width: 120 }}><Select.Option value="all">All</Select.Option><Select.Option value="active">Active</Select.Option><Select.Option value="inactive">Inactive</Select.Option></Select></Form.Item></Col>
-                    <Col><Form.Item label="Updated At" style={{ marginBottom: 0 }}><RangePicker onChange={dates=>{setDateRange(dates); setPagination(p=>({...p, current:1}));}} /></Form.Item></Col>
-                </Row>
-            </div>
-
-            <Table
-                columns={getColumns()}
-                dataSource={goodsModels}
-                rowKey="id"
-                loading={loading}
-                pagination={{...pagination, showSizeChanger: true, pageSizeOptions: ['10', '20', '50', '100'], showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`}}
-                onChange={handleTableChange}
-                onRow={(record) => ({ onDoubleClick: () => navigate(`/master-data/goods-models/${record.id}`)})}
+            <Spin spinning={loading}>
+            <Table 
+                dataSource={filteredModels} 
+                columns={columns.filter(c => visibleColumns.includes(c.key as string))} 
+                rowKey="id" 
+                size="small" 
+                bordered 
+                pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '20', '50'] }}
             />
-
-            <Modal title="Create Goods Model" open={isModalOpen} onOk={handleSave} onCancel={handleCancel} confirmLoading={isSaving} okText="Save" width={600}>
-                <Form form={form} layout="vertical" name="create_goods_model_form" className="mt-6">
-                     <Row gutter={16}>
-                        <Col span={12}><Form.Item name="code" label="Code" rules={[{ required: true }]}><Input /></Form.Item></Col>
-                        <Col span={12}><Form.Item name="name" label="Name" rules={[{ required: true }]}><Input /></Form.Item></Col>
-                        <Col span={12}><Form.Item name="goods_type_id" label="Goods Type" rules={[{ required: true }]}><Select options={goodsTypes.map(gt => ({ label: gt.name, value: gt.id }))} /></Form.Item></Col>
-                        <Col span={12}><Form.Item name="base_uom_id" label="Base UoM" rules={[{ required: true }]}><Select options={uoms.map(uom => ({ label: uom.name, value: uom.id }))} /></Form.Item></Col>
-                        <Col span={12}><Form.Item name="tracking_type" label="Tracking Type" initialValue="NONE" rules={[{ required: true }]}><Select options={['NONE', 'LOT', 'SERIAL'].map(t => ({ label: t, value: t }))} /></Form.Item></Col>
-                        <Col span={12}><Form.Item name="is_active" label="Status" initialValue={true}><Select><Select.Option value={true}>Active</Select.Option><Select.Option value={false}>Inactive</Select.Option></Select></Form.Item></Col>
-                        <Col span={24}><Form.Item name="description" label="Notes"><Input.TextArea rows={3} /></Form.Item></Col>
-                     </Row>
-                </Form>
-            </Modal>
-        </Card>
-    );
+            </Spin>
+        </Space>
+      </Card>
+  );
 };
 
 const GoodsModelsListPageWrapper: React.FC = () => (

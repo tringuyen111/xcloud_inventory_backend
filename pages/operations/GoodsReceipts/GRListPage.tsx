@@ -1,296 +1,237 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../lib/supabase';
-import { Warehouse, Database } from '../../../types/supabase';
-import {
-    Button, Table, Tag, Space, App, Card, Row, Col, Input, Select, Form, Dropdown, Menu, Typography, DatePicker, Checkbox
-} from 'antd';
-import { useNavigate, Link } from 'react-router-dom';
-import {
-    PlusOutlined, SearchOutlined, ClearOutlined, EllipsisOutlined, EyeOutlined, EditOutlined, DeleteOutlined,
-    ExportOutlined, ProfileOutlined, DownOutlined
-} from '@ant-design/icons';
-import type { TableProps } from 'antd';
-import type { CheckboxChangeEvent } from 'antd/es/checkbox';
-import { format } from 'date-fns';
+import React, { useEffect, useState, useMemo } from 'react';
+import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, DatePicker, Dropdown, Menu, Checkbox } from 'antd';
+import { EyeOutlined, PlusOutlined, FileExcelOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { useDebounce } from '../../../hooks/useDebounce';
+import dayjs from 'dayjs';
+import isBetween from 'dayjs/plugin/isBetween';
+import { goodsReceiptAPI, warehouseAPI, partnerAPI } from '../../../utils/apiClient';
+// FIX: Import Supabase Database types to correctly type API responses.
+import { Database } from '../../../types/supabase';
 
-const { Title, Text } = Typography;
+dayjs.extend(isBetween);
+const { RangePicker } = DatePicker;
 
-// This type should match the structure of your v_goods_receipts_summary view
-type GoodsReceiptSummary = {
-    id: number;
-    reference_number: string;
-    warehouse_id: number;
-    warehouse_name: string;
-    partner_name: string;
-    status: 'DRAFT' | 'CREATED' | 'RECEIVING' | 'PARTIAL_RECEIVED' | 'APPROVED' | 'COMPLETED';
-    total_lines: number;
-    created_at: string;
+// FIX: Define types for related data to ensure type safety.
+type Warehouse = Database['master']['Tables']['warehouses']['Row'];
+type Partner = Database['master']['Tables']['partners']['Row'];
+
+interface GoodsReceipt {
+  id: string;
+  code: string;
+  document_date: string;
+  warehouse_id: string;
+  supplier_id: string;
+  status: 'DRAFT' | 'CREATED' | 'RECEIVING' | 'RECEIVED' | 'COMPLETED' | 'CANCELLED';
+}
+
+const GR_STATUSES: GoodsReceipt['status'][] = ['DRAFT', 'CREATED', 'RECEIVING', 'RECEIVED', 'COMPLETED', 'CANCELLED'];
+
+const getStatusColor = (status: GoodsReceipt['status']) => {
+  switch (status) {
+    case 'DRAFT': return 'default';
+    case 'CREATED': return 'processing';
+    case 'RECEIVING': return 'blue';
+    case 'RECEIVED': return 'purple';
+    case 'COMPLETED': return 'success';
+    case 'CANCELLED': return 'error';
+    default: return 'default';
+  }
 };
 
+const GRListPage: React.FC = () => {
+  const [allGrList, setAllGrList] = useState<GoodsReceipt[]>([]);
+  const [filteredGrList, setFilteredGrList] = useState<GoodsReceipt[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [warehouses, setWarehouses] = useState<{ id: string, name: string }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: string, name: string }[]>([]);
+  
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [warehouseFilter, setWarehouseFilter] = useState<string[]>([]);
+  const [supplierFilter, setSupplierFilter] = useState<string[]>([]);
+  const [dateFilter, setDateFilter] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
 
-const GR_STATUSES: GoodsReceiptSummary['status'][] = ['DRAFT', 'CREATED', 'RECEIVING', 'PARTIAL_RECEIVED', 'APPROVED', 'COMPLETED'];
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const navigate = useNavigate();
+  const { notification } = App.useApp();
+  
+  const warehousesMap = useMemo(() => new Map(warehouses.map(w => [w.id, w.name])), [warehouses]);
+  const suppliersMap = useMemo(() => new Map(suppliers.map(s => [s.id, s.name])), [suppliers]);
 
-const STATUS_COLOR_MAP: Record<GoodsReceiptSummary['status'], string> = {
-    DRAFT: 'gold',
-    CREATED: 'blue',
-    RECEIVING: 'orange',
-    PARTIAL_RECEIVED: 'purple',
-    APPROVED: 'cyan',
-    COMPLETED: 'green',
-};
+  const columns = useMemo(() => [
+    { title: 'GR Code', dataIndex: 'code', key: 'code', sorter: (a: GoodsReceipt, b: GoodsReceipt) => a.code.localeCompare(b.code) },
+    { 
+      title: 'Document Date', 
+      dataIndex: 'document_date', 
+      key: 'document_date',
+      render: (date: string) => date ? dayjs(date).format('YYYY-MM-DD') : 'N/A',
+      sorter: (a: GoodsReceipt, b: GoodsReceipt) => dayjs(a.document_date).unix() - dayjs(b.document_date).unix(),
+    },
+    { title: 'Warehouse', dataIndex: 'warehouse_id', key: 'warehouse_id', render: (id: string) => warehousesMap.get(id) || id },
+    { title: 'Supplier', dataIndex: 'supplier_id', key: 'supplier_id', render: (id: string) => suppliersMap.get(id) || id },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: GoodsReceipt['status']) => <Tag color={getStatusColor(status)}>{status}</Tag>,
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, record: GoodsReceipt) => (
+        <Space size="middle">
+          <Tooltip title="View Details">
+            <Button icon={<EyeOutlined />} onClick={() => navigate(`/operations/gr/${record.id}`)} />
+          </Tooltip>
+        </Space>
+      ),
+    },
+  ], [navigate, warehousesMap, suppliersMap]);
 
-const defaultColumns: TableProps<GoodsReceiptSummary>['columns'] = [
-    { title: 'Reference No.', dataIndex: 'reference_number', key: 'reference_number' },
-    { title: 'Warehouse', dataIndex: 'warehouse_name', key: 'warehouse' },
-    { title: 'Partner', dataIndex: 'partner_name', key: 'partner_name' },
-    { title: 'Status', dataIndex: 'status', key: 'status' },
-    { title: 'Total Lines', dataIndex: 'total_lines', key: 'total_lines', align: 'center' },
-    { title: 'Created At', dataIndex: 'created_at', key: 'created_at' },
-    { title: 'Actions', key: 'action', align: 'center' as const },
-];
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => columns.map(c => c.key as string));
 
-const GoodsReceiptListPage: React.FC = () => {
-    const [goodsReceipts, setGoodsReceipts] = useState<GoodsReceiptSummary[]>([]);
-    const [loading, setLoading] = useState(true);
-    const { notification, modal } = App.useApp();
-    const navigate = useNavigate();
-    const [filterForm] = Form.useForm();
-    
-    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-    const [filters, setFilters] = useState<any>({});
-    const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
-    const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns.map(c => c.key as string));
-
-    const fetchData = useCallback(async (page: number, pageSize: number, currentFilters: any) => {
-        setLoading(true);
-        try {
-            // Using the view for optimized data fetching
-            let query = supabase
-                .from('v_goods_receipts_summary')
-                .select('*', { count: 'exact' });
-
-            if (currentFilters.warehouse_id) query = query.eq('warehouse_id', currentFilters.warehouse_id);
-            if (currentFilters.status) query = query.eq('status', currentFilters.status);
-            if (currentFilters.reference_number) query = query.ilike('reference_number', `%${currentFilters.reference_number}%`);
-            
-            const { data, error, count } = await query
-                .order('created_at', { ascending: false })
-                .range((page - 1) * pageSize, page * pageSize - 1);
-
-            if (error) throw error;
-            setGoodsReceipts(data as GoodsReceiptSummary[] || []);
-            setPagination(prev => ({ ...prev, total: count || 0, current: page, pageSize }));
-        } catch (error: any) {
-            notification.error({ message: "Error fetching goods receipts", description: error.message });
-        } finally {
-            setLoading(false);
-        }
-    }, [notification]);
-
-    const fetchDropdownData = useCallback(async () => {
-        try {
-            const { data, error } = await supabase.from('warehouses').select('id, name').eq('is_active', true);
-            if (error) throw error;
-            setWarehouses(data || []);
-        } catch (error: any) {
-            notification.error({ message: "Error fetching warehouses", description: error.message });
-        }
-    }, [notification]);
-
-    useEffect(() => {
-        fetchData(pagination.current, pagination.pageSize, filters);
-    }, [fetchData, pagination.current, pagination.pageSize, filters]);
-
-    useEffect(() => {
-        fetchDropdownData();
-    }, [fetchDropdownData]);
-
-    const handleTableChange = (paginationConfig: any) => {
-        setPagination(prev => ({ ...prev, ...paginationConfig }));
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [grData, whData, supData] = await Promise.all([
+            goodsReceiptAPI.list(),
+            warehouseAPI.list(),
+            partnerAPI.list()
+        ]);
+        setAllGrList(grData as GoodsReceipt[]);
+        // FIX: Cast API response to the correct type before mapping to avoid errors.
+        setWarehouses((whData as Warehouse[]).map(w => ({ id: w.id, name: w.name })));
+        setSuppliers((supData as Partner[]).filter(p => p.is_supplier).map(s => ({ id: s.id, name: s.name })));
+      } catch (error: any) {
+        notification.error({ message: 'Error fetching data', description: error.message });
+      } finally {
+        setLoading(false);
+      }
     };
+    fetchData();
+  }, [notification]);
 
-    const handleFilterSubmit = (values: any) => {
-        setPagination(p => ({ ...p, current: 1 }));
-        setFilters(values);
-    };
-
-    const handleFilterClear = () => {
-        filterForm.resetFields();
-        setPagination(p => ({ ...p, current: 1 }));
-        setFilters({});
-    };
-
-    const handleDelete = (id: number) => {
-        modal.confirm({
-            title: 'Are you sure?',
-            content: 'This will delete the goods receipt and all its lines. This action cannot be undone.',
-            okText: 'Yes, delete it',
-            okType: 'danger',
-            onOk: async () => {
-                try {
-                    const { error } = await supabase.from('goods_receipts').delete().eq('id', id);
-                    if (error) throw error;
-                    notification.success({ message: 'Goods Receipt deleted successfully' });
-                    fetchData(pagination.current, pagination.pageSize, filters);
-                } catch (error: any) {
-                    notification.error({ message: 'Failed to delete', description: error.message });
-                }
-            },
+  useEffect(() => {
+    let filtered = [...allGrList];
+    if (debouncedSearchTerm) {
+      filtered = filtered.filter(item =>
+        item.code.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+      );
+    }
+    if (statusFilter.length > 0) {
+        filtered = filtered.filter(item => statusFilter.includes(item.status));
+    }
+    if (warehouseFilter.length > 0) {
+        filtered = filtered.filter(item => warehouseFilter.includes(item.warehouse_id));
+    }
+    if (supplierFilter.length > 0) {
+        filtered = filtered.filter(item => supplierFilter.includes(item.supplier_id));
+    }
+    if (dateFilter && dateFilter[0] && dateFilter[1]) {
+        const [start, end] = dateFilter;
+        filtered = filtered.filter(item => {
+            const docDate = dayjs(item.document_date);
+            return docDate.isBetween(start, end, 'day', '[]');
         });
-    };
-    
-    const exportToCsv = (filename: string, data: GoodsReceiptSummary[]) => {
-        const visibleCols = defaultColumns.filter(c => visibleColumns.includes(c.key as string) && c.key !== 'action');
-        const header = visibleCols.map(c => c.title).join(',');
-        const rows = data.map(row => 
-            visibleCols.map(col => {
-                let value;
-                if (Array.isArray(col.dataIndex)) {
-                    value = col.dataIndex.reduce((obj, key) => (obj && obj[key] !== undefined) ? obj[key] : '', row as any);
-                } else if (col.key === 'created_at') {
-                    value = format(new Date(row.created_at), 'yyyy-MM-dd HH:mm');
-                } else {
-                    value = row[col.dataIndex as keyof GoodsReceiptSummary];
-                }
-                if (value === null || value === undefined) return '';
-                return `"${String(value).replace(/"/g, '""')}"`;
-            }).join(',')
-        );
-        const csv = [header, ...rows].join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute('download', filename);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    const columnsMenu = (
+    }
+    setFilteredGrList(filtered);
+  }, [debouncedSearchTerm, statusFilter, warehouseFilter, supplierFilter, dateFilter, allGrList]);
+  
+  const columnSelector = (
+    <Dropdown
+      overlay={
         <Menu>
-            {defaultColumns.filter(c => c.key !== 'action').map(col => {
-                const key = col.key as string;
-                return (
-                    <Menu.Item key={key} onClick={(e) => e.domEvent.stopPropagation()}>
-                        <Checkbox
-                            checked={visibleColumns.includes(key)}
-                            onChange={(e: CheckboxChangeEvent) => {
-                                const checked = e.target.checked;
-                                if (checked) {
-                                    setVisibleColumns(prev => [...prev, key]);
-                                } else {
-                                    if (visibleColumns.filter(k => k !== 'action').length > 1) {
-                                        setVisibleColumns(prev => prev.filter(k => k !== key));
-                                    } else {
-                                        notification.warning({ message: "At least one column must be visible." });
-                                    }
-                                }
-                            }}
-                        >
-                            {col.title as string}
-                        </Checkbox>
-                    </Menu.Item>
-                )
-            })}
+          <Checkbox.Group
+            className="flex flex-col p-2"
+            options={columns.map(({ key, title }) => ({ label: title as string, value: key as string }))}
+            value={visibleColumns}
+            onChange={(values) => setVisibleColumns(values as string[])}
+          />
         </Menu>
-    );
-
-    const getColumns = (): TableProps<GoodsReceiptSummary>['columns'] => {
-        const actionMenu = (record: GoodsReceiptSummary) => (
-            <Menu>
-                <Menu.Item key="1" icon={<EyeOutlined />} onClick={() => navigate(`/operations/gr/${record.id}`)}>View</Menu.Item>
-                <Menu.Item key="2" icon={<EditOutlined />} onClick={() => navigate(`/operations/gr/${record.id}/edit`)}>Edit</Menu.Item>
-                <Menu.Divider />
-                <Menu.Item key="3" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)}>Delete</Menu.Item>
-            </Menu>
-        );
-
-        const cols = defaultColumns.map(col => {
-            const newCol = { ...col };
-            switch (newCol.key) {
-                case 'reference_number':
-                    newCol.render = (text, record) => <Link to={`/operations/gr/${record.id}`}>{text || `GR-${record.id}`}</Link>;
-                    break;
-                case 'created_at':
-                    newCol.render = (text) => text ? format(new Date(text), 'yyyy-MM-dd HH:mm') : '-';
-                    break;
-                case 'status':
-                    newCol.render = (status: GoodsReceiptSummary['status']) => <Tag color={STATUS_COLOR_MAP[status]}>{status}</Tag>;
-                    break;
-                case 'action':
-                    newCol.render = (_, record) => (
-                        <Dropdown overlay={actionMenu(record)} trigger={['click']}>
-                            <Button type="text" icon={<EllipsisOutlined />} />
-                        </Dropdown>
-                    );
-                    break;
-                default:
-                    break;
-            }
-            return newCol;
-        });
-
-        return cols.filter(c => visibleColumns.includes(c.key as string));
-    };
-
-    return (
-        <Card>
-            <Row justify="space-between" align="middle" className="mb-4">
-                <Col>
-                    <Title level={4} style={{ margin: 0 }}>📋 Goods Receipt List</Title>
-                    <Text type="secondary">Manage incoming inventory shipments.</Text>
-                </Col>
-                <Col>
-                    <Space>
-                        <Button icon={<ExportOutlined />} onClick={() => exportToCsv('goods_receipts.csv', goodsReceipts)}>Export</Button>
-                        <Dropdown overlay={columnsMenu} trigger={['click']}>
-                            <Button icon={<ProfileOutlined />}>Columns <DownOutlined /></Button>
-                        </Dropdown>
-                        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/gr/create')}>Create</Button>
-                    </Space>
-                </Col>
-            </Row>
-
-            <div className="p-4 mb-6 bg-gray-50 rounded-lg">
-                <Form form={filterForm} onFinish={handleFilterSubmit} layout="inline" style={{ flexWrap: 'wrap', gap: '16px' }}>
-                    <Form.Item name="warehouse_id" label="Warehouse" className="flex-1 min-w-[200px] mb-0">
-                        <Select allowClear placeholder="Select Warehouse">
-                            {warehouses.map(w => <Select.Option key={w.id} value={w.id}>{w.name}</Select.Option>)}
-                        </Select>
-                    </Form.Item>
-                    <Form.Item name="status" label="Status" className="flex-1 min-w-[150px] mb-0">
-                        <Select allowClear placeholder="Select Status">
-                            {GR_STATUSES.map(s => <Select.Option key={s} value={s}>{s}</Select.Option>)}
-                        </Select>
-                    </Form.Item>
-                    <Form.Item name="reference_number" label="Reference" className="flex-1 min-w-[200px] mb-0">
-                        <Input placeholder="Enter reference number..." />
-                    </Form.Item>
-                    <Form.Item className="mb-0">
-                        <Space>
-                            <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>Search</Button>
-                            <Button onClick={handleFilterClear} icon={<ClearOutlined />}>Clear</Button>
-                        </Space>
-                    </Form.Item>
-                </Form>
-            </div>
-
-            <Table
-                columns={getColumns()}
-                dataSource={goodsReceipts}
-                rowKey="id"
-                loading={loading}
-                pagination={{...pagination, showSizeChanger: true, pageSizeOptions: ['10', '25', '50'], showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`}}
-                onChange={handleTableChange}
-                onRow={(record) => ({ onDoubleClick: () => navigate(`/operations/gr/${record.id}`)})}
-                scroll={{ x: 'max-content' }}
-            />
-        </Card>
-    );
-};
-
-const GoodsReceiptListPageWrapper: React.FC = () => (
-    <App><GoodsReceiptListPage /></App>
+      }
+      trigger={['click']}
+    >
+      <Button icon={<EyeOutlined />}>Columns</Button>
+    </Dropdown>
 );
 
-export default GoodsReceiptListPageWrapper;
+  return (
+    <Card
+      title="Goods Receipts"
+      extra={
+        <Space>
+          {columnSelector}
+          <Button icon={<FileExcelOutlined />}>Export</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/gr/create')}>
+            Create
+          </Button>
+        </Space>
+      }
+    >
+      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={12} md={8}>
+            <Input.Search 
+              placeholder="Search by GR code..." 
+              onSearch={setSearchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              allowClear
+            />
+          </Col>
+          <Col xs={24} sm={12} md={8}>
+              <Select
+                  mode="multiple"
+                  allowClear
+                  style={{ width: '100%' }}
+                  placeholder="Filter by status..."
+                  onChange={setStatusFilter}
+                  options={GR_STATUSES.map(status => ({ label: status, value: status }))}
+              />
+          </Col>
+          <Col xs={24} sm={12} md={8}>
+            <RangePicker style={{ width: '100%' }} onChange={(dates) => setDateFilter(dates as any)} />
+          </Col>
+          <Col xs={24} sm={12} md={8}>
+              <Select
+                  mode="multiple"
+                  allowClear
+                  style={{ width: '100%' }}
+                  placeholder="Filter by warehouse..."
+                  onChange={setWarehouseFilter}
+                  options={warehouses.map(w => ({ label: w.name, value: w.id }))}
+              />
+          </Col>
+          <Col xs={24} sm={12} md={8}>
+              <Select
+                  mode="multiple"
+                  allowClear
+                  style={{ width: '100%' }}
+                  placeholder="Filter by supplier..."
+                  onChange={setSupplierFilter}
+                  options={suppliers.map(s => ({ label: s.name, value: s.id }))}
+              />
+          </Col>
+        </Row>
+        <Spin spinning={loading}>
+          <Table 
+              dataSource={filteredGrList} 
+              columns={columns.filter(c => visibleColumns.includes(c.key as string))} 
+              rowKey="id" 
+              size="small" 
+              bordered 
+              pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '20', '50'] }}
+          />
+        </Spin>
+      </Space>
+    </Card>
+  );
+};
+
+const GRListPageWrapper: React.FC = () => (
+    <App><GRListPage /></App>
+);
+
+export default GRListPageWrapper;

@@ -1,9 +1,10 @@
-
 import React from 'react';
+import { Card } from 'antd';
 
-const Page: React.FC = () => (
-    <div className="p-6 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-semibold text-[#1e293b]">Goods Transfer</h1>
-    </div>
+const PlaceholderPage: React.FC = () => (
+    <Card>
+        Content cleared as requested. This component is ready for new implementation.
+    </Card>
 );
-export default Page;
+
+export default PlaceholderPage;

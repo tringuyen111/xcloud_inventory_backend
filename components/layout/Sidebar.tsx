@@ -20,13 +20,13 @@ const ChevronDownIcon = ({ className }: { className?: string }) => <svg xmlns="h
 
 const navItems: NavItem[] = [
     { name: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
-    { name: 'Onhand', path: '/onhand', icon: <CubeIcon /> },
     { name: 'Operations', path: '/operations', icon: <CogIcon />, subItems: [
         { name: 'Goods Receipt', path: '/operations/gr', icon: <div/> },
-        { name: 'Goods Issue', path: '/operations/gi', icon: <div/> },
-        { name: 'Inventory Count', path: '/operations/ic', icon: <div/> },
-        { name: 'Goods Transfer', path: '/operations/gt', icon: <div/> },
         { name: 'Putaway', path: '/operations/pa', icon: <div/> },
+        { name: 'Onhand', path: '/operations/onhand', icon: <div/> },
+        { name: 'Inventory Count', path: '/operations/ic', icon: <div/> },
+        { name: 'Goods Issue', path: '/operations/gi', icon: <div/> },
+        { name: 'Goods Transfer', path: '/operations/gt', icon: <div/> },
     ]},
     { name: 'Master Data', path: '/master-data', icon: <CubeIcon />, subItems: [
         { name: 'Organizations', path: '/master-data/organizations', icon: <div/> },
@@ -43,7 +43,6 @@ const navItems: NavItem[] = [
     { name: 'Settings', path: '/settings', icon: <CogIcon /> },
     { name: 'Developer', path: '/dev', icon: <CodeIcon />, subItems: [
         { name: 'DB Schema', path: '/dev/db-schema', icon: <div/> },
-        { name: 'Supabase MCP', path: '/dev/supabase-mcp', icon: <div/> },
     ]},
 ];
 
