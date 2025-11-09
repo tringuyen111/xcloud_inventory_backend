@@ -4,18 +4,11 @@ import { EyeOutlined, PlusOutlined, EditOutlined, FileExcelOutlined } from '@ant
 import { useNavigate } from 'react-router-dom';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { partnerAPI } from '../../../utils/apiClient';
+import { Database } from '../../../types/supabase';
 
 const { RangePicker } = DatePicker;
 
-interface Partner {
-  id: string;
-  code: string;
-  name: string;
-  is_supplier: boolean;
-  is_customer: boolean;
-  is_carrier: boolean;
-  is_active: boolean;
-}
+type Partner = Database['master']['Tables']['partners']['Row'];
 
 const PARTNER_TYPES = [
     { label: 'Supplier', value: 'supplier' },
@@ -76,7 +69,7 @@ const PartnersListPage: React.FC = () => {
       setLoading(true);
       try {
         const data = await partnerAPI.list();
-        setAllPartners(data);
+        setAllPartners(data || []);
       } catch (error: any) {
         notification.error({ message: 'Error fetching partners', description: error.message });
       } finally {

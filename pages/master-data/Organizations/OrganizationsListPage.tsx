@@ -6,17 +6,9 @@ import { useDebounce } from '../../../hooks/useDebounce';
 import { organizationAPI } from '../../../utils/apiClient';
 import type { TableProps } from 'antd';
 import dayjs from 'dayjs';
+import { Database } from '../../../types/supabase';
 
-// Define the type for an Organization row based on the schema
-interface Organization {
-  id: string;
-  code: string;
-  name: string;
-  tax_code: string | null;
-  phone: string | null;
-  is_active: boolean;
-  updated_at: string;
-}
+type Organization = Database['master']['Tables']['organizations']['Row'];
 
 const OrganizationsListPage: React.FC = () => {
   const [allOrganizations, setAllOrganizations] = useState<Organization[]>([]);
@@ -68,11 +60,10 @@ const OrganizationsListPage: React.FC = () => {
     const fetchOrganizations = async () => {
       setLoading(true);
       try {
-        // FIX: Reverted to using apiClient, which is the correct way to fetch data from non-public schemas.
         const data = await organizationAPI.list();
-        setAllOrganizations(data as Organization[]);
+        setAllOrganizations(data);
       } catch (error: any) {
-        notification.error({ message: 'Error fetching organizations', description: error.message });
+         notification.error({ message: 'Error fetching organizations', description: error.message });
       } finally {
         setLoading(false);
       }

@@ -1,3 +1,5 @@
+
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, DatePicker, Dropdown, Menu, Checkbox } from 'antd';
 import { EyeOutlined, PlusOutlined, FileExcelOutlined } from '@ant-design/icons';
@@ -6,34 +8,22 @@ import { useDebounce } from '../../../hooks/useDebounce';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import { goodsIssueAPI, warehouseAPI, partnerAPI } from '../../../utils/apiClient';
-// FIX: Import Supabase Database types to correctly type API responses.
 import { Database } from '../../../types/supabase';
 
 dayjs.extend(isBetween);
 const { RangePicker } = DatePicker;
 
-// FIX: Define types for related data to ensure type safety.
+type GoodsIssue = Database['transactions']['Tables']['gi_header']['Row'];
 type Warehouse = Database['master']['Tables']['warehouses']['Row'];
 type Partner = Database['master']['Tables']['partners']['Row'];
 
-interface GoodsIssue {
-  id: string;
-  code: string;
-  document_date: string;
-  warehouse_id: string;
-  customer_id: string;
-  status: 'DRAFT' | 'CREATED' | 'PICKING' | 'PICKED' | 'WAITING_FOR_APPROVAL' | 'COMPLETED' | 'CANCELLED';
-}
-
-const GI_STATUSES: GoodsIssue['status'][] = ['DRAFT', 'CREATED', 'PICKING', 'PICKED', 'WAITING_FOR_APPROVAL', 'COMPLETED', 'CANCELLED'];
+const GI_STATUSES: GoodsIssue['status'][] = ['DRAFT', 'WAITING_FOR_APPROVAL', 'APPROVED', 'COMPLETED', 'CANCELLED'];
 
 const getStatusColor = (status: GoodsIssue['status']) => {
   switch (status) {
     case 'DRAFT': return 'default';
-    case 'CREATED': return 'processing';
-    case 'PICKING': return 'blue';
-    case 'PICKED': return 'purple';
     case 'WAITING_FOR_APPROVAL': return 'warning';
+    case 'APPROVED': return 'processing';
     case 'COMPLETED': return 'success';
     case 'CANCELLED': return 'error';
     default: return 'default';
@@ -42,12 +32,10 @@ const getStatusColor = (status: GoodsIssue['status']) => {
 
 const GIListPage: React.FC = () => {
   const [allGiList, setAllGiList] = useState<GoodsIssue[]>([]);
-  const [filteredGiList, setFilteredGiList] = useState<GoodsIssue[]>([]);
   const [loading, setLoading] = useState(true);
-  const [warehouses, setWarehouses] = useState<{ id: string, name: string }[]>([]);
-  const [customers, setCustomers] = useState<{ id: string, name: string }[]>([]);
+  const [warehouses, setWarehouses] = useState<Pick<Warehouse, 'id' | 'name'>[]>([]);
+  const [customers, setCustomers] = useState<Pick<Partner, 'id' | 'name'>[]>([]);
 
-  // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [warehouseFilter, setWarehouseFilter] = useState<string[]>([]);
@@ -57,10 +45,10 @@ const GIListPage: React.FC = () => {
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const navigate = useNavigate();
   const { notification } = App.useApp();
-
+  
   const warehousesMap = useMemo(() => new Map(warehouses.map(w => [w.id, w.name])), [warehouses]);
   const customersMap = useMemo(() => new Map(customers.map(c => [c.id, c.name])), [customers]);
-  
+
   const columns = useMemo(() => [
     { title: 'GI Code', dataIndex: 'code', key: 'code', sorter: (a: GoodsIssue, b: GoodsIssue) => a.code.localeCompare(b.code) },
     { 
@@ -70,8 +58,8 @@ const GIListPage: React.FC = () => {
       render: (date: string) => date ? dayjs(date).format('YYYY-MM-DD') : 'N/A',
       sorter: (a: GoodsIssue, b: GoodsIssue) => dayjs(a.document_date).unix() - dayjs(b.document_date).unix(),
     },
-    { title: 'Warehouse', dataIndex: 'warehouse_id', key: 'warehouse_id', render: (id: string) => warehousesMap.get(id) || id },
-    { title: 'Customer', dataIndex: 'customer_id', key: 'customer_id', render: (id: string) => customersMap.get(id) || id },
+    { title: 'Warehouse', dataIndex: 'warehouse_id', key: 'warehouse_id', render: (id: string) => warehousesMap.get(id) || 'N/A' },
+    { title: 'Customer', dataIndex: 'customer_id', key: 'customer_id', render: (id: string | null) => id ? customersMap.get(id) || 'N/A' : 'N/A' },
     {
       title: 'Status',
       dataIndex: 'status',
@@ -97,15 +85,15 @@ const GIListPage: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [giData, whData, custData] = await Promise.all([
+        const [giData, whData, partnerData] = await Promise.all([
           goodsIssueAPI.list(),
           warehouseAPI.list(),
           partnerAPI.list()
         ]);
-        setAllGiList(giData as GoodsIssue[]);
-        // FIX: Cast API responses to the correct types before mapping to avoid errors.
-        setWarehouses((whData as Warehouse[]).map(w => ({ id: w.id, name: w.name })));
-        setCustomers((custData as Partner[]).filter(p => p.is_customer).map(c => ({ id: c.id, name: c.name })));
+
+        setAllGiList(giData || []);
+        setWarehouses(whData || []);
+        setCustomers(partnerData.filter(p => p.is_customer) || []);
       } catch (error: any) {
         notification.error({ message: 'Error fetching data', description: error.message });
       } finally {
@@ -115,7 +103,7 @@ const GIListPage: React.FC = () => {
     fetchData();
   }, [notification]);
 
-  useEffect(() => {
+  const filteredGiList = useMemo(() => {
     let filtered = [...allGiList];
     if (debouncedSearchTerm) {
       filtered = filtered.filter(item =>
@@ -129,13 +117,13 @@ const GIListPage: React.FC = () => {
         filtered = filtered.filter(item => warehouseFilter.includes(item.warehouse_id));
     }
     if (customerFilter.length > 0) {
-        filtered = filtered.filter(item => customerFilter.includes(item.customer_id));
+        filtered = filtered.filter(item => item.customer_id && customerFilter.includes(item.customer_id));
     }
     if (dateFilter && dateFilter[0] && dateFilter[1]) {
         const [start, end] = dateFilter;
         filtered = filtered.filter(item => dayjs(item.document_date).isBetween(start, end, 'day', '[]'));
     }
-    setFilteredGiList(filtered);
+    return filtered;
   }, [debouncedSearchTerm, statusFilter, warehouseFilter, customerFilter, dateFilter, allGiList]);
   
   const columnSelector = (

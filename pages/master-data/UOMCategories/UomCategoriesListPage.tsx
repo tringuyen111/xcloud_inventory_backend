@@ -53,7 +53,7 @@ const UomCategoriesListPage: React.FC = () => {
       setLoading(true);
       try {
         const data = await uomCategoryAPI.list();
-        setAllCategories(data as UomCategory[]);
+        setAllCategories(data || []);
       } catch (error: any) {
         notification.error({ message: 'Error fetching UoM categories', description: error.message });
       } finally {

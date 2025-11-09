@@ -75,7 +75,7 @@ const GoodsTypesListPage: React.FC = () => {
       setLoading(true);
       try {
         const data = await goodsTypeAPI.list();
-        setAllGoodsTypes(data as GoodsType[]);
+        setAllGoodsTypes(data || []);
       } catch (error: any) {
         notification.error({ message: 'Error fetching Goods Types', description: error.message });
       } finally {
@@ -117,9 +117,6 @@ const GoodsTypesListPage: React.FC = () => {
         if (node.parent_id) {
             const parent = goodsTypesIdMap.get(node.parent_id);
             if (parent) {
-                // FIX: TypeScript's inference for recursive functions within closures can be unreliable.
-                // Explicitly casting `parent` ensures its type is correctly recognized as `GoodsType`,
-                // resolving the "Argument of type 'unknown' is not assignable" error.
                 addWithAncestors(parent as GoodsType);
             }
         }

@@ -4,23 +4,11 @@ import { EyeOutlined, PlusOutlined, EditOutlined, FileExcelOutlined } from '@ant
 import { useNavigate } from 'react-router-dom';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { goodsModelAPI, goodsTypeAPI, uomAPI } from '../../../utils/apiClient';
-// FIX: Import Supabase Database types to correctly type API responses.
 import { Database } from '../../../types/supabase';
 
-// FIX: Define types for related data to ensure type safety.
 type GoodsType = Database['master']['Tables']['goods_types']['Row'];
 type Uom = Database['master']['Tables']['uoms']['Row'];
-
-interface GoodsModel {
-  id: string;
-  code: string;
-  name: string;
-  sku: string;
-  goods_type_id: string;
-  base_uom_id: string;
-  tracking_type: string;
-  is_active: boolean;
-}
+type GoodsModel = Database['master']['Tables']['goods_models']['Row'];
 
 const TRACKING_TYPES = ['NONE', 'LOT', 'SERIAL'];
 
@@ -28,8 +16,8 @@ const GoodsModelsListPage: React.FC = () => {
   const [allModels, setAllModels] = useState<GoodsModel[]>([]);
   const [filteredModels, setFilteredModels] = useState<GoodsModel[]>([]);
   const [loading, setLoading] = useState(true);
-  const [goodsTypes, setGoodsTypes] = useState<{ id: string, name: string }[]>([]);
-  const [uoms, setUoms] = useState<{ id: string, name: string }[]>([]);
+  const [goodsTypes, setGoodsTypes] = useState<Pick<GoodsType, 'id' | 'name'>[]>([]);
+  const [uoms, setUoms] = useState<Pick<Uom, 'id' | 'name'>[]>([]);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -80,10 +68,10 @@ const GoodsModelsListPage: React.FC = () => {
             goodsTypeAPI.list(),
             uomAPI.list()
         ]);
-        setAllModels(modelData as GoodsModel[]);
-        // FIX: Cast API responses to the correct types before mapping to avoid errors.
-        setGoodsTypes((goodsTypeData as GoodsType[]).map(g => ({ id: g.id, name: g.name })));
-        setUoms((uomData as Uom[]).map(u => ({ id: u.id, name: u.name })));
+
+        setAllModels(modelData || []);
+        setGoodsTypes(goodsTypeData || []);
+        setUoms(uomData || []);
       } catch (error: any) {
         notification.error({ message: 'Error fetching goods models', description: error.message });
       } finally {

@@ -4,29 +4,18 @@ import { EyeOutlined, PlusOutlined, EditOutlined, FileExcelOutlined } from '@ant
 import { useNavigate } from 'react-router-dom';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { uomAPI, uomCategoryAPI } from '../../../utils/apiClient';
-// FIX: Import Supabase Database types to correctly type API responses.
 import { Database } from '../../../types/supabase';
 
 const { RangePicker } = DatePicker;
 
-// FIX: Define types for related data to ensure type safety.
 type UomCategory = Database['master']['Tables']['uom_categories']['Row'];
-
-interface Uom {
-  id: string;
-  code: string;
-  name: string;
-  symbol: string;
-  uom_category_id: string;
-  is_base_unit: boolean;
-  is_active: boolean;
-}
+type Uom = Database['master']['Tables']['uoms']['Row'];
 
 const UomsListPage: React.FC = () => {
   const [allUoms, setAllUoms] = useState<Uom[]>([]);
   const [filteredUoms, setFilteredUoms] = useState<Uom[]>([]);
   const [loading, setLoading] = useState(true);
-  const [categories, setCategories] = useState<{ id: string, name: string }[]>([]);
+  const [categories, setCategories] = useState<Pick<UomCategory, 'id' | 'name'>[]>([]);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,10 +59,12 @@ const UomsListPage: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [uomData, catData] = await Promise.all([uomAPI.list(), uomCategoryAPI.list()]);
-        setAllUoms(uomData as Uom[]);
-        // FIX: Cast API response to the correct type before mapping to avoid errors.
-        setCategories((catData as UomCategory[]).map(c => ({ id: c.id, name: c.name })));
+        const [uomData, catData] = await Promise.all([
+          uomAPI.list(),
+          uomCategoryAPI.list()
+        ]);
+        setAllUoms(uomData || []);
+        setCategories(catData || []);
       } catch (error: any) {
         notification.error({ message: 'Error fetching UoMs', description: error.message });
       } finally {

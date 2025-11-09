@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { App, Button, Card, Form, Input, Spin, Switch, Space, Select, Row, Col } from 'antd';
 import { SaveOutlined, CloseOutlined } from '@ant-design/icons';
@@ -26,13 +25,16 @@ const WarehouseFormPage: React.FC = () => {
             setLoading(true);
             try {
                 const branchList = await branchAPI.list();
-                setBranches((branchList as Branch[]).map(b => ({ id: b.id, name: b.name })));
+                setBranches(branchList || []);
                 
                 if (id) {
                     const data = await warehouseAPI.get(id);
-                    form.setFieldsValue(data);
+                    if (data) {
+                      form.setFieldsValue(data);
+                    }
                 } else {
                     form.resetFields();
+                    form.setFieldsValue({ is_active: true });
                 }
             } catch (error: any) {
                 notification.error({ message: 'Error fetching data', description: error.message });

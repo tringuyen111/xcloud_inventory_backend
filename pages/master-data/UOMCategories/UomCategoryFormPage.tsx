@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useState } from 'react';
 import { App, Button, Card, Form, Input, Spin, Switch, Space, Row, Col } from 'antd';
 import { SaveOutlined, CloseOutlined } from '@ant-design/icons';
@@ -26,8 +24,8 @@ const UomCategoryFormPage: React.FC = () => {
         if (id) {
             setLoading(true);
             uomCategoryAPI.get(id)
-                .then(data => {
-                    form.setFieldsValue(data);
+                .then((data) => {
+                    if (data) form.setFieldsValue(data);
                 })
                 .catch(error => notification.error({ message: 'Error fetching UoM Category', description: error.message }))
                 .finally(() => setLoading(false));
@@ -38,14 +36,14 @@ const UomCategoryFormPage: React.FC = () => {
     }, [id, form, notification]);
 
     const onFinish = async (values: any) => {
-        if (!profile?.organization_id) {
-            notification.error({ message: 'Error', description: 'User organization not found.' });
+        if (!profile?.organization_uuid) {
+            notification.error({ message: 'Error', description: 'User organization could not be determined.' });
             return;
         }
         setLoading(true);
         const payload = {
             ...values,
-            organization_id: profile.organization_id.toString(),
+            organization_id: profile.organization_uuid,
         };
         try {
             if (isEdit) {
@@ -119,7 +117,7 @@ const UomCategoryFormPage: React.FC = () => {
                         </Form.Item>
                     </Form>
                 ) : (
-                    <div>Loading user profile...</div>
+                    <div className="text-center p-8">Loading user and organization context...</div>
                 )}
             </Spin>
         </Card>

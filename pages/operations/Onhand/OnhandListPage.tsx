@@ -3,34 +3,21 @@ import { App, Card, Input, Space, Spin, Table, Button, Row, Col, Dropdown, Menu,
 import { FileExcelOutlined, EyeOutlined } from '@ant-design/icons';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { inventoryAPI, warehouseAPI, locationAPI, goodsModelAPI } from '../../../utils/apiClient';
-// FIX: Import Supabase Database types to correctly type API responses.
 import { Database } from '../../../types/supabase';
 
-// FIX: Define types for related data to ensure type safety.
 type Warehouse = Database['master']['Tables']['warehouses']['Row'];
 type Location = Database['master']['Tables']['locations']['Row'];
 type GoodsModel = Database['master']['Tables']['goods_models']['Row'];
-
-interface OnhandItem {
-  id: string;
-  warehouse_id: string;
-  location_id: string;
-  goods_model_id: string;
-  lot_number?: string;
-  serial_number?: string;
-  quantity_onhand: number;
-  quantity_reserved: number;
-  quantity_available: number;
-}
+type OnhandItem = Database['inventory']['Tables']['onhand']['Row'];
 
 const OnhandListPage: React.FC = () => {
   const [allOnhand, setAllOnhand] = useState<OnhandItem[]>([]);
   const [filteredOnhand, setFilteredOnhand] = useState<OnhandItem[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [warehouses, setWarehouses] = useState<{ id: string, name: string }[]>([]);
-  const [locations, setLocations] = useState<{ id: string, code: string }[]>([]);
-  const [goodsModels, setGoodsModels] = useState<{ id: string, code: string, name: string }[]>([]);
+  const [warehouses, setWarehouses] = useState<Pick<Warehouse, 'id' | 'name'>[]>([]);
+  const [locations, setLocations] = useState<Pick<Location, 'id' | 'code'>[]>([]);
+  const [goodsModels, setGoodsModels] = useState<Pick<GoodsModel, 'id' | 'code' | 'name'>[]>([]);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,7 +40,7 @@ const OnhandListPage: React.FC = () => {
     { title: 'Serial Number', dataIndex: 'serial_number', key: 'serial_number' },
     { title: 'Onhand', dataIndex: 'quantity_onhand', key: 'quantity_onhand', sorter: (a: OnhandItem, b: OnhandItem) => a.quantity_onhand - b.quantity_onhand, },
     { title: 'Reserved', dataIndex: 'quantity_reserved', key: 'quantity_reserved', sorter: (a: OnhandItem, b: OnhandItem) => a.quantity_reserved - b.quantity_reserved, },
-    { title: 'Available', dataIndex: 'quantity_available', key: 'quantity_available', sorter: (a: OnhandItem, b: OnhandItem) => a.quantity_available - b.quantity_available, },
+    { title: 'Available', dataIndex: 'quantity_available', key: 'quantity_available', sorter: (a: OnhandItem, b: OnhandItem) => (a.quantity_available ?? 0) - (b.quantity_available ?? 0), },
   ], [warehousesMap, locationsMap, goodsModelsMap]);
   
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => columns.map(c => c.key as string));
@@ -68,11 +55,11 @@ const OnhandListPage: React.FC = () => {
           locationAPI.list(),
           goodsModelAPI.list()
         ]);
-        setAllOnhand(onhandData as OnhandItem[]);
-        // FIX: Cast API responses to the correct types before mapping to avoid errors.
-        setWarehouses((whData as Warehouse[]).map(w => ({ id: w.id, name: w.name })));
-        setLocations((locData as Location[]).map(l => ({ id: l.id, code: l.code })));
-        setGoodsModels((goodsData as GoodsModel[]).map(g => ({ id: g.id, code: g.code, name: g.name })));
+
+        setAllOnhand(onhandData || []);
+        setWarehouses(whData || []);
+        setLocations(locData || []);
+        setGoodsModels(goodsData || []);
       } catch(error: any) {
         notification.error({ message: 'Error fetching onhand stock', description: error.message });
       } finally {

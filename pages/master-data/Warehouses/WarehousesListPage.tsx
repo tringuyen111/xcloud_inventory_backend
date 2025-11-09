@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
 import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, Dropdown, Menu, Checkbox } from 'antd';
 import { EyeOutlined, PlusOutlined, EditOutlined, FileExcelOutlined } from '@ant-design/icons';
@@ -72,9 +71,13 @@ const WarehousesListPage: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [warehouseData, branchData] = await Promise.all([warehouseAPI.list(), branchAPI.list()]);
-        setAllWarehouses(warehouseData as Warehouse[]);
-        setBranches((branchData as Branch[]).map(b => ({ id: b.id, name: b.name })));
+        const [warehouseData, branchData] = await Promise.all([
+          warehouseAPI.list(),
+          branchAPI.list()
+        ]);
+        
+        setAllWarehouses(warehouseData || []);
+        setBranches(branchData || []);
       } catch (error: any) {
         notification.error({ message: 'Error fetching data', description: error.message });
       } finally {

@@ -5,7 +5,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { organizationAPI } from '../../../utils/apiClient';
 import { Database } from '../../../types/supabase';
 
-// Explicitly type the form values based on the DB schema
 type OrganizationInsert = Database['master']['Tables']['organizations']['Insert'];
 type OrganizationUpdate = Database['master']['Tables']['organizations']['Update'];
 
@@ -26,21 +25,20 @@ const OrganizationFormPage: React.FC = () => {
             setLoading(true);
             const fetchOrganization = async () => {
                 try {
-                    // FIX: Reverted to using apiClient.
                     const data = await organizationAPI.get(id);
                     if (data) {
                         form.setFieldsValue(data);
                     }
-                } catch (error: any) {
-                     notification.error({ message: 'Error fetching organization', description: error.message });
+                } catch(error: any) {
+                    notification.error({ message: 'Error fetching organization', description: error.message });
                 } finally {
                     setLoading(false);
                 }
             };
             fetchOrganization();
         } else {
-            // Reset form for 'Create' mode
             form.resetFields();
+            form.setFieldsValue({ is_active: true });
         }
     }, [id, form, notification]);
 
@@ -48,11 +46,9 @@ const OrganizationFormPage: React.FC = () => {
         setLoading(true);
         try {
             if (isEdit) {
-                // FIX: Reverted to using apiClient.
                 await organizationAPI.update(id!, values as OrganizationUpdate);
                 notification.success({ message: 'Success', description: 'Organization updated successfully.' });
             } else {
-                // FIX: Reverted to using apiClient.
                 await organizationAPI.create(values as OrganizationInsert);
                 notification.success({ message: 'Success', description: 'Organization created successfully.' });
             }

@@ -30,18 +30,19 @@ const UomFormPage: React.FC = () => {
             setLoading(true);
             try {
                 const [catRes, uomRes] = await Promise.all([
-                    uomCategoryAPI.list(),
-                    uomAPI.list()
+                  uomCategoryAPI.list(),
+                  uomAPI.list()
                 ]);
-                setCategories(catRes as UomCategory[]);
-                setUoms(uomRes as Uom[]);
+
+                setCategories(catRes || []);
+                setUoms(uomRes || []);
 
                 if (id) {
                     const data = await uomAPI.get(id);
-                    form.setFieldsValue(data);
+                    if (data) form.setFieldsValue(data);
                 } else {
                     form.resetFields();
-                    form.setFieldsValue({ is_base_unit: false });
+                    form.setFieldsValue({ is_base_unit: false, is_active: true });
                 }
             } catch (error: any) {
                 notification.error({ message: 'Error fetching data', description: error.message });
@@ -53,14 +54,14 @@ const UomFormPage: React.FC = () => {
     }, [id, form, notification]);
 
     const onFinish = async (values: any) => {
-        if (!profile?.organization_id) {
-            notification.error({ message: 'Error', description: 'User organization not found.' });
+        if (!profile?.organization_uuid) {
+            notification.error({ message: 'Error', description: 'User organization could not be determined.' });
             return;
         }
         setLoading(true);
         const finalValues = {
             ...values,
-            organization_id: profile.organization_id.toString(),
+            organization_id: profile.organization_uuid,
             base_unit_id: values.is_base_unit ? null : values.base_unit_id,
             conversion_factor: values.is_base_unit ? 1 : values.conversion_factor,
         };
@@ -87,7 +88,7 @@ const UomFormPage: React.FC = () => {
         <Card title={isEdit ? 'Edit Unit of Measure' : 'Create Unit of Measure'}>
             <Spin spinning={loading || profileLoading}>
                 {isReady ? (
-                <Form form={form} layout="vertical" onFinish={onFinish}>
+                <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ is_active: true }}>
                     <Row gutter={16}>
                         <Col span={12}>
                             <Form.Item name="uom_category_id" label="UoM Category" rules={[{ required: true }]}>
@@ -155,7 +156,7 @@ const UomFormPage: React.FC = () => {
                     </Form.Item>
                 </Form>
                 ) : (
-                    <div>Loading user profile...</div>
+                    <div className="text-center p-8">Loading user and organization context...</div>
                 )}
             </Spin>
         </Card>

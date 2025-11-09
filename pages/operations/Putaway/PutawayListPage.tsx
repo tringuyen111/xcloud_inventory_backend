@@ -3,25 +3,24 @@ import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, S
 import { EyeOutlined, PlusOutlined, FileExcelOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useDebounce } from '../../../hooks/useDebounce';
-import { putawayAPI } from '../../../utils/apiClient';
+import { putawayAPI, warehouseAPI, goodsReceiptAPI } from '../../../utils/apiClient';
+import { Database } from '../../../types/supabase';
 
-interface Putaway {
-  id: string;
-  documentNo: string;
-  goodsCode: string;
-  goodsName: string;
-  quantity: number;
-  fromLocation: string;
-  toLocation: string;
-  status: 'DRAFT' | 'MOVING' | 'COMPLETED' | 'CANCELLED';
-}
+type PutawayHeader = Database['transactions']['Tables']['putaway_header']['Row'];
+type Warehouse = Database['master']['Tables']['warehouses']['Row'];
+type GoodsReceipt = Database['transactions']['Tables']['gr_header']['Row'];
 
-const PUTAWAY_STATUSES: Putaway['status'][] = ['DRAFT', 'MOVING', 'COMPLETED', 'CANCELLED'];
+type PutawayWithData = PutawayHeader & {
+  warehouseName?: string;
+  grCode?: string;
+};
 
-const getStatusColor = (status: Putaway['status']) => {
+const PUTAWAY_STATUSES: PutawayHeader['status'][] = ['DRAFT', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+
+const getStatusColor = (status: PutawayHeader['status']) => {
   switch (status) {
     case 'DRAFT': return 'default';
-    case 'MOVING': return 'processing';
+    case 'IN_PROGRESS': return 'processing';
     case 'COMPLETED': return 'success';
     case 'CANCELLED': return 'error';
     default: return 'default';
@@ -29,8 +28,8 @@ const getStatusColor = (status: Putaway['status']) => {
 };
 
 const PutawayListPage: React.FC = () => {
-  const [allPutaways, setAllPutaways] = useState<Putaway[]>([]);
-  const [filteredPutaways, setFilteredPutaways] = useState<Putaway[]>([]);
+  const [putaways, setPutaways] = useState<PutawayWithData[]>([]);
+  const [filteredPutaways, setFilteredPutaways] = useState<PutawayWithData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -39,22 +38,19 @@ const PutawayListPage: React.FC = () => {
   const { notification } = App.useApp();
 
   const columns = useMemo(() => [
-    { title: 'Document No', dataIndex: 'documentNo', key: 'documentNo' },
-    { title: 'Goods Code', dataIndex: 'goodsCode', key: 'goodsCode' },
-    { title: 'Goods Name', dataIndex: 'goodsName', key: 'goodsName' },
-    { title: 'Quantity', dataIndex: 'quantity', key: 'quantity' },
-    { title: 'From Location', dataIndex: 'fromLocation', key: 'fromLocation' },
-    { title: 'To Location', dataIndex: 'toLocation', key: 'toLocation' },
+    { title: 'Document No', dataIndex: 'code', key: 'code' },
+    { title: 'GR No', dataIndex: 'grCode', key: 'grCode', render: (code?: string) => code || 'N/A' },
+    { title: 'Warehouse', dataIndex: 'warehouseName', key: 'warehouseName', render: (name?: string) => name || 'N/A' },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status: Putaway['status']) => <Tag color={getStatusColor(status)}>{status}</Tag>,
+      render: (status: PutawayHeader['status']) => <Tag color={getStatusColor(status)}>{status}</Tag>,
     },
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: Putaway) => (
+      render: (_: any, record: PutawayHeader) => (
         <Space size="middle">
           <Tooltip title="View Details">
             <Button icon={<EyeOutlined />} onClick={() => navigate(`/operations/pa/${record.id}`)} />
@@ -70,8 +66,22 @@ const PutawayListPage: React.FC = () => {
     const fetchPutaways = async () => {
       setLoading(true);
       try {
-        const data = await putawayAPI.list();
-        setAllPutaways(data);
+        const [putawayData, warehouseData, grData] = await Promise.all([
+          putawayAPI.list(),
+          warehouseAPI.list(),
+          goodsReceiptAPI.list()
+        ]);
+
+        const warehouseMap = new Map(warehouseData.map(w => [w.id, w.name]));
+        const grMap = new Map(grData.map(gr => [gr.id, gr.code]));
+
+        const enrichedData = putawayData.map(p => ({
+          ...p,
+          warehouseName: warehouseMap.get(p.warehouse_id),
+          grCode: p.gr_header_id ? grMap.get(p.gr_header_id) : undefined,
+        }));
+        
+        setPutaways(enrichedData);
       } catch (error: any) {
         notification.error({ message: 'Error fetching putaway tasks', description: error.message });
       } finally {
@@ -82,17 +92,18 @@ const PutawayListPage: React.FC = () => {
   }, [notification]);
 
   useEffect(() => {
-    let filtered = [...allPutaways];
+    let filtered = [...putaways];
     if (debouncedSearchTerm) {
       filtered = filtered.filter(item =>
-        item.documentNo.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+        item.code.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        item.grCode?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
       );
     }
     if (statusFilter.length > 0) {
         filtered = filtered.filter(item => statusFilter.includes(item.status));
     }
     setFilteredPutaways(filtered);
-  }, [debouncedSearchTerm, statusFilter, allPutaways]);
+  }, [debouncedSearchTerm, statusFilter, putaways]);
 
   const columnSelector = (
     <Dropdown
@@ -128,7 +139,7 @@ const PutawayListPage: React.FC = () => {
       <Row gutter={[16, 16]} className="mb-4">
         <Col xs={24} sm={12} md={8}>
           <Input.Search 
-            placeholder="Search by document no..." 
+            placeholder="Search by document or GR no..." 
             onSearch={setSearchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             allowClear

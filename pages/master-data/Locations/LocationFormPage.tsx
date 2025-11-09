@@ -30,15 +30,18 @@ const LocationFormPage: React.FC = () => {
                     warehouseAPI.list(),
                     locationAPI.list()
                 ]);
-                setWarehouses(whRes as Warehouse[]);
-                setLocations(locRes as Location[]);
+                
+                setWarehouses(whRes || []);
+                setLocations(locRes || []);
 
                 if (id) {
                     const data = await locationAPI.get(id);
-                    form.setFieldsValue(data);
+                    if (data) {
+                      form.setFieldsValue(data);
+                    }
                 } else {
                     form.resetFields();
-                    form.setFieldsValue({ is_blocked: false });
+                    form.setFieldsValue({ is_blocked: false, is_active: true });
                 }
             } catch (error: any) {
                 notification.error({ message: 'Error fetching data', description: error.message });
@@ -51,7 +54,6 @@ const LocationFormPage: React.FC = () => {
 
     const onFinish = async (values: any) => {
         setLoading(true);
-        // branch_id and organization_id are inferred on the backend via triggers from warehouse_id
         try {
             if (isEdit) {
                 await locationAPI.update(id!, values as LocationUpdate);
@@ -71,7 +73,7 @@ const LocationFormPage: React.FC = () => {
     return (
         <Card title={isEdit ? 'Edit Location' : 'Create Location'}>
             <Spin spinning={loading}>
-                <Form form={form} layout="vertical" onFinish={onFinish}>
+                <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ is_active: true }}>
                     <Row gutter={16}>
                         <Col span={12}>
                             <Form.Item name="warehouse_id" label="Warehouse" rules={[{ required: true }]}>

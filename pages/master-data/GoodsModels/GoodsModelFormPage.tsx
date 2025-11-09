@@ -38,16 +38,16 @@ const GoodsModelFormPage: React.FC = () => {
                     goodsTypeAPI.list(),
                     uomAPI.list()
                 ]);
-
-                setGoodsTypes(gtRes as GoodsType[]);
-                setUoms(uomRes as Uom[]);
+                
+                setGoodsTypes(gtRes || []);
+                setUoms(uomRes || []);
 
                 if (id) {
                     const data = await goodsModelAPI.get(id);
-                    form.setFieldsValue(data);
+                    if (data) form.setFieldsValue(data);
                 } else {
                     form.resetFields();
-                    form.setFieldsValue({ tracking_type: 'NONE' });
+                    form.setFieldsValue({ tracking_type: 'NONE', is_active: true });
                 }
             } catch (error: any) {
                 notification.error({ message: 'Error', description: error.message });
@@ -59,14 +59,14 @@ const GoodsModelFormPage: React.FC = () => {
     }, [id, form, notification]);
 
     const onFinish = async (values: any) => {
-         if (!profile?.organization_id) {
-            notification.error({ message: 'Error', description: 'User organization not found.' });
+         if (!profile?.organization_uuid) {
+            notification.error({ message: 'Error', description: 'User organization could not be determined.' });
             return;
         }
         setLoading(true);
         const payload = {
             ...values,
-            organization_id: profile.organization_id.toString(),
+            organization_id: profile.organization_uuid,
         };
         try {
             if (isEdit) {
@@ -90,7 +90,7 @@ const GoodsModelFormPage: React.FC = () => {
         <Card title={isEdit ? 'Edit Goods Model' : 'Create Goods Model'}>
             <Spin spinning={loading || profileLoading}>
                  {isReady ? (
-                    <Form form={form} layout="vertical" onFinish={onFinish}>
+                    <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ is_active: true }}>
                         <Row gutter={16}>
                              {isEdit && (
                                 <Col span={12}>
@@ -159,7 +159,7 @@ const GoodsModelFormPage: React.FC = () => {
                         </Form.Item>
                     </Form>
                  ) : (
-                    <div>Loading user profile...</div>
+                    <div className="text-center p-8">Loading user and organization context...</div>
                 )}
             </Spin>
         </Card>

@@ -72,9 +72,13 @@ const BranchesListPage: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [branchData, orgData] = await Promise.all([branchAPI.list(), organizationAPI.list()]);
-        setAllBranches(branchData as Branch[]);
-        setOrganizations((orgData as Organization[]).map(o => ({ id: o.id, name: o.name })));
+        const [branchData, orgData] = await Promise.all([
+            branchAPI.list(),
+            organizationAPI.list()
+        ]);
+
+        setAllBranches(branchData || []);
+        setOrganizations(orgData || []);
       } catch (error: any) {
         notification.error({ message: 'Error fetching data', description: error.message });
       } finally {

@@ -1,21 +1,36 @@
-
 import React, { useEffect, useState } from 'react';
 import { App, Card, Col, Row, Space, Spin, Statistic, Table, Tag, Typography, Alert } from 'antd';
-import { InboxOutlined, ShoppingCartOutlined, SwapOutlined, TruckOutlined, BoxPlotOutlined } from '@ant-design/icons';
-import { dashboardAPI } from '../../utils/apiClient';
+import { InboxOutlined, ShoppingCartOutlined, TruckOutlined, BoxPlotOutlined } from '@ant-design/icons';
+import { apiCall } from '../../lib/api'; 
 import dayjs from 'dayjs';
 
-interface SummaryStats {
+// Data structure from the /dashboard/summary API endpoint
+interface DashboardSummary {
   totalStock: number;
   totalGoods: number;
   totalReceipts: number;
   totalIssues: number;
   totalTransfers: number;
-  recentActivities: any[];
+  recentActivities: RecentActivity[];
+}
+
+// Assuming the structure for recent activities based on current UI needs
+interface RecentActivity {
+  id: string;
+  date: string;
+  type: 'GR' | 'GI' | 'GT';
+  documentNo: string;
+  warehouseName: string;
 }
 
 const DashboardPage: React.FC = () => {
-    const [summary, setSummary] = useState<SummaryStats | null>(null);
+    const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+    const [kpi, setKpi] = useState({
+        total_quantity_onhand: 0,
+        total_goods_count: 0,
+        total_receipts: 0,
+        total_issues: 0,
+    });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const { notification } = App.useApp();
@@ -25,8 +40,18 @@ const DashboardPage: React.FC = () => {
             setLoading(true);
             setError(null);
             try {
-                const data = await dashboardAPI.getSummary();
-                setSummary(data);
+                // Refactored to use the new apiCall helper and the /dashboard/summary endpoint
+                const summaryData = await apiCall<DashboardSummary>('/dashboard/summary');
+                
+                setKpi({
+                    total_quantity_onhand: summaryData.totalStock,
+                    total_goods_count: summaryData.totalGoods,
+                    total_receipts: summaryData.totalReceipts,
+                    total_issues: summaryData.totalIssues,
+                });
+                
+                setRecentActivities(summaryData.recentActivities || []);
+
             } catch (err: any) {
                 setError(err.message);
                 notification.error({
@@ -49,18 +74,18 @@ const DashboardPage: React.FC = () => {
             key: 'type',
             render: (type: string) => {
                 let color = 'default';
-                if (type === 'Receipt') color = 'success';
-                if (type === 'Issue') color = 'error';
-                if (type === 'Transfer') color = 'processing';
-                return <Tag color={color}>{type.toUpperCase()}</Tag>;
+                if (type === 'GR') color = 'success';
+                if (type === 'GI') color = 'error';
+                if (type === 'GT') color = 'processing';
+                return <Tag color={color}>{type?.toUpperCase()}</Tag>;
             }
         },
-        { title: 'Status', dataIndex: 'status', key: 'status' },
+        { title: 'Warehouse', dataIndex: 'warehouseName', key: 'warehouseName' },
         {
             title: 'Date',
             dataIndex: 'date',
             key: 'date',
-            render: (date: string) => dayjs(date).format('YYYY-MM-DD HH:mm')
+            render: (date: string) => date ? dayjs(date).format('YYYY-MM-DD HH:mm') : 'N/A'
         },
     ];
 
@@ -73,43 +98,37 @@ const DashboardPage: React.FC = () => {
                 <Typography.Text type="secondary">Overview of warehouse operations and key metrics.</Typography.Text>
             </div>
 
-
             {error && <Alert message="Error" description={error} type="error" showIcon />}
 
             <Spin spinning={loading}>
                 <Row gutter={[16, 16]}>
                     <Col xs={24} sm={12} md={8} lg={6} xl={4}>
                         <Card>
-                            <Statistic title="Total Onhand" value={summary?.totalStock ?? 0} prefix={<InboxOutlined />} />
+                            <Statistic title="Total Onhand" value={kpi.total_quantity_onhand} prefix={<InboxOutlined />} />
                         </Card>
                     </Col>
                     <Col xs={24} sm={12} md={8} lg={6} xl={4}>
                         <Card>
-                            <Statistic title="Total Goods" value={summary?.totalGoods ?? 0} prefix={<BoxPlotOutlined />} />
+                            <Statistic title="Total Goods" value={kpi.total_goods_count} prefix={<BoxPlotOutlined />} />
                         </Card>
                     </Col>
                     <Col xs={24} sm={12} md={8} lg={6} xl={4}>
                         <Card>
-                            <Statistic title="Receipts" value={summary?.totalReceipts ?? 0} prefix={<TruckOutlined style={{ transform: 'scaleX(-1)' }} />} />
+                            <Statistic title="Receipts (30d)" value={kpi.total_receipts} prefix={<TruckOutlined style={{ transform: 'scaleX(-1)' }} />} />
                         </Card>
                     </Col>
                     <Col xs={24} sm={12} md={8} lg={6} xl={4}>
                         <Card>
-                            <Statistic title="Issues" value={summary?.totalIssues ?? 0} prefix={<ShoppingCartOutlined />} />
-                        </Card>
-                    </Col>
-                    <Col xs={24} sm={12} md={8} lg={6} xl={4}>
-                        <Card>
-                            <Statistic title="Transfers" value={summary?.totalTransfers ?? 0} prefix={<SwapOutlined />} />
+                            <Statistic title="Issues (30d)" value={kpi.total_issues} prefix={<ShoppingCartOutlined />} />
                         </Card>
                     </Col>
                 </Row>
 
                 <Card title="Recent Activities" style={{ marginTop: 16 }}>
                     <Table
-                        dataSource={summary?.recentActivities ?? []}
+                        dataSource={recentActivities}
                         columns={activityColumns}
-                        rowKey="documentNo"
+                        rowKey="id"
                         pagination={{ pageSize: 5 }}
                         size="small"
                     />

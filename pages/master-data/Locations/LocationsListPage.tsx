@@ -4,28 +4,18 @@ import { EyeOutlined, PlusOutlined, EditOutlined, FileExcelOutlined } from '@ant
 import { useNavigate } from 'react-router-dom';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { locationAPI, warehouseAPI } from '../../../utils/apiClient';
-// FIX: Import Supabase Database types to correctly type API responses.
 import { Database } from '../../../types/supabase';
 
 const { RangePicker } = DatePicker;
 
-// FIX: Define types for related data to ensure type safety.
 type Warehouse = Database['master']['Tables']['warehouses']['Row'];
-
-interface Location {
-  id: string;
-  code: string;
-  name: string;
-  warehouse_id: string;
-  location_type: string;
-  is_active: boolean;
-}
+type Location = Database['master']['Tables']['locations']['Row'];
 
 const LocationsListPage: React.FC = () => {
   const [allLocations, setAllLocations] = useState<Location[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
-  const [warehouses, setWarehouses] = useState<{ id: string, name: string }[]>([]);
+  const [warehouses, setWarehouses] = useState<Pick<Warehouse, 'id' | 'name'>[]>([]);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -67,10 +57,13 @@ const LocationsListPage: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [locData, whData] = await Promise.all([locationAPI.list(), warehouseAPI.list()]);
-        setAllLocations(locData as Location[]);
-        // FIX: Cast API response to the correct type before mapping to avoid errors.
-        setWarehouses((whData as Warehouse[]).map(w => ({ id: w.id, name: w.name })));
+        const [locData, whData] = await Promise.all([
+          locationAPI.list(),
+          warehouseAPI.list()
+        ]);
+        
+        setAllLocations(locData || []);
+        setWarehouses(whData || []);
       } catch (error: any) {
         notification.error({ message: 'Error fetching locations', description: error.message });
       } finally {

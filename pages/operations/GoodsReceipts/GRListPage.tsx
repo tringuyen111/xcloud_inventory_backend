@@ -1,3 +1,5 @@
+
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, DatePicker, Dropdown, Menu, Checkbox } from 'antd';
 import { EyeOutlined, PlusOutlined, FileExcelOutlined } from '@ant-design/icons';
@@ -6,33 +8,22 @@ import { useDebounce } from '../../../hooks/useDebounce';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import { goodsReceiptAPI, warehouseAPI, partnerAPI } from '../../../utils/apiClient';
-// FIX: Import Supabase Database types to correctly type API responses.
 import { Database } from '../../../types/supabase';
 
 dayjs.extend(isBetween);
 const { RangePicker } = DatePicker;
 
-// FIX: Define types for related data to ensure type safety.
+type GoodsReceipt = Database['transactions']['Tables']['gr_header']['Row'];
 type Warehouse = Database['master']['Tables']['warehouses']['Row'];
 type Partner = Database['master']['Tables']['partners']['Row'];
 
-interface GoodsReceipt {
-  id: string;
-  code: string;
-  document_date: string;
-  warehouse_id: string;
-  supplier_id: string;
-  status: 'DRAFT' | 'CREATED' | 'RECEIVING' | 'RECEIVED' | 'COMPLETED' | 'CANCELLED';
-}
-
-const GR_STATUSES: GoodsReceipt['status'][] = ['DRAFT', 'CREATED', 'RECEIVING', 'RECEIVED', 'COMPLETED', 'CANCELLED'];
+const GR_STATUSES: GoodsReceipt['status'][] = ['DRAFT', 'CREATED', 'RECEIVING', 'COMPLETED', 'CANCELLED'];
 
 const getStatusColor = (status: GoodsReceipt['status']) => {
   switch (status) {
     case 'DRAFT': return 'default';
     case 'CREATED': return 'processing';
     case 'RECEIVING': return 'blue';
-    case 'RECEIVED': return 'purple';
     case 'COMPLETED': return 'success';
     case 'CANCELLED': return 'error';
     default: return 'default';
@@ -41,12 +32,10 @@ const getStatusColor = (status: GoodsReceipt['status']) => {
 
 const GRListPage: React.FC = () => {
   const [allGrList, setAllGrList] = useState<GoodsReceipt[]>([]);
-  const [filteredGrList, setFilteredGrList] = useState<GoodsReceipt[]>([]);
   const [loading, setLoading] = useState(true);
-  const [warehouses, setWarehouses] = useState<{ id: string, name: string }[]>([]);
-  const [suppliers, setSuppliers] = useState<{ id: string, name: string }[]>([]);
+  const [warehouses, setWarehouses] = useState<Pick<Warehouse, 'id' | 'name'>[]>([]);
+  const [suppliers, setSuppliers] = useState<Pick<Partner, 'id' | 'name'>[]>([]);
   
-  // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [warehouseFilter, setWarehouseFilter] = useState<string[]>([]);
@@ -69,8 +58,8 @@ const GRListPage: React.FC = () => {
       render: (date: string) => date ? dayjs(date).format('YYYY-MM-DD') : 'N/A',
       sorter: (a: GoodsReceipt, b: GoodsReceipt) => dayjs(a.document_date).unix() - dayjs(b.document_date).unix(),
     },
-    { title: 'Warehouse', dataIndex: 'warehouse_id', key: 'warehouse_id', render: (id: string) => warehousesMap.get(id) || id },
-    { title: 'Supplier', dataIndex: 'supplier_id', key: 'supplier_id', render: (id: string) => suppliersMap.get(id) || id },
+    { title: 'Warehouse', dataIndex: 'warehouse_id', key: 'warehouse_id', render: (id: string) => warehousesMap.get(id) || 'N/A' },
+    { title: 'Supplier', dataIndex: 'supplier_id', key: 'supplier_id', render: (id: string | null) => id ? suppliersMap.get(id) || 'N/A' : 'N/A' },
     {
       title: 'Status',
       dataIndex: 'status',
@@ -96,15 +85,15 @@ const GRListPage: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [grData, whData, supData] = await Promise.all([
+        const [grData, whData, partnerData] = await Promise.all([
             goodsReceiptAPI.list(),
             warehouseAPI.list(),
             partnerAPI.list()
         ]);
-        setAllGrList(grData as GoodsReceipt[]);
-        // FIX: Cast API response to the correct type before mapping to avoid errors.
-        setWarehouses((whData as Warehouse[]).map(w => ({ id: w.id, name: w.name })));
-        setSuppliers((supData as Partner[]).filter(p => p.is_supplier).map(s => ({ id: s.id, name: s.name })));
+
+        setAllGrList(grData || []);
+        setWarehouses(whData || []);
+        setSuppliers(partnerData.filter(p => p.is_supplier) || []);
       } catch (error: any) {
         notification.error({ message: 'Error fetching data', description: error.message });
       } finally {
@@ -114,7 +103,7 @@ const GRListPage: React.FC = () => {
     fetchData();
   }, [notification]);
 
-  useEffect(() => {
+  const filteredGrList = useMemo(() => {
     let filtered = [...allGrList];
     if (debouncedSearchTerm) {
       filtered = filtered.filter(item =>
@@ -128,7 +117,7 @@ const GRListPage: React.FC = () => {
         filtered = filtered.filter(item => warehouseFilter.includes(item.warehouse_id));
     }
     if (supplierFilter.length > 0) {
-        filtered = filtered.filter(item => supplierFilter.includes(item.supplier_id));
+        filtered = filtered.filter(item => item.supplier_id && supplierFilter.includes(item.supplier_id));
     }
     if (dateFilter && dateFilter[0] && dateFilter[1]) {
         const [start, end] = dateFilter;
@@ -137,7 +126,7 @@ const GRListPage: React.FC = () => {
             return docDate.isBetween(start, end, 'day', '[]');
         });
     }
-    setFilteredGrList(filtered);
+    return filtered;
   }, [debouncedSearchTerm, statusFilter, warehouseFilter, supplierFilter, dateFilter, allGrList]);
   
   const columnSelector = (

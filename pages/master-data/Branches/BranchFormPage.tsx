@@ -25,13 +25,16 @@ const BranchFormPage: React.FC = () => {
             setLoading(true);
             try {
                 const orgs = await organizationAPI.list();
-                setOrganizations((orgs as Organization[]).map(o => ({ id: o.id, name: o.name })));
+                setOrganizations(orgs || []);
                 
                 if (id) {
                     const data = await branchAPI.get(id);
-                    form.setFieldsValue(data);
+                    if (data) {
+                      form.setFieldsValue(data);
+                    }
                 } else {
                     form.resetFields();
+                    form.setFieldsValue({ is_active: true });
                 }
             } catch (error: any) {
                 notification.error({ message: 'Error fetching data', description: error.message });
