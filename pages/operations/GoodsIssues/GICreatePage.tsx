@@ -112,7 +112,7 @@ const GICreatePage: React.FC = () => {
 
     const handleRemoveLine = (key: string) => setLines(lines.filter(line => line.key !== key));
 
-    const handleSubmit = async (action: 'draft' | 'submit') => {
+    const handleSubmit = async (action: 'draft' | 'create') => {
         if (!profile?.organization_uuid || !profile.id) {
             notification.error({ message: 'User profile/organization not found.' }); return;
         }
@@ -154,12 +154,12 @@ const GICreatePage: React.FC = () => {
                 if (linesError) throw new Error(`Failed to save lines: ${linesError.message}`);
             }
 
-            if (action === 'submit') {
-                const { error: rpcError } = await supabase.rpc('gi_submit_for_approval', { p_gi_header_id: createdHeader.id });
-                if (rpcError) throw new Error(`Failed to submit for approval: ${rpcError.message}`);
+            if (action === 'create') {
+                const { error: rpcError } = await supabase.rpc('gi_create_and_reserve', { p_gi_header_id: createdHeader.id });
+                if (rpcError) throw new Error(`Failed to create and reserve stock: ${rpcError.message}`);
             }
 
-            notification.success({ message: `Goods Issue saved as ${action === 'draft' ? 'Draft' : 'Submitted'} successfully.` });
+            notification.success({ message: `Goods Issue saved as ${action === 'draft' ? 'Draft' : 'Created & Reserved'} successfully.` });
             navigate('/operations/gi');
 
         } catch (error: any) {
@@ -284,7 +284,7 @@ const GICreatePage: React.FC = () => {
                         <Row justify="end"><Col><Space>
                             <Button danger icon={<CloseOutlined />} onClick={() => navigate('/operations/gi')}>Cancel</Button>
                             <Button icon={<SaveOutlined />} onClick={() => handleSubmit('draft')} loading={loading}>Save Draft</Button>
-                            <Button type="primary" icon={<SaveOutlined />} onClick={() => handleSubmit('submit')} loading={loading}>Submit for Approval</Button>
+                            <Button type="primary" icon={<SaveOutlined />} onClick={() => handleSubmit('create')} loading={loading}>Create &amp; Reserve</Button>
                         </Space></Col></Row>
                     </Card>
                 </Affix>

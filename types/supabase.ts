@@ -1,4 +1,5 @@
 
+
 export type Json =
   | string
   | number
@@ -2573,6 +2574,10 @@ export type Database = {
         };
         gr_cancel: {
             Args: { p_gr_header_id: string, p_cancellation_reason: string };
+            Returns: undefined;
+        };
+        gi_create_and_reserve: {
+            Args: { p_gi_header_id: string };
             Returns: undefined;
         };
         gi_submit_for_approval: {
