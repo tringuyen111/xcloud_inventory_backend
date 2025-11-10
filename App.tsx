@@ -63,6 +63,7 @@ import GTViewPage from './pages/operations/GoodsTransfers/GTViewPage';
 
 import ICListPage from './pages/operations/InventoryCounts/ICListPage';
 import ICCreatePage from './pages/operations/InventoryCounts/ICCreatePage';
+import ICViewPage from './pages/operations/InventoryCounts/ICViewPage';
 
 import PutawayListPage from './pages/operations/Putaway/PutawayListPage';
 import PutawayCreatePage from './pages/operations/Putaway/PutawayCreatePage';
@@ -129,6 +130,7 @@ const App: React.FC = () => {
                     <Route path="/operations/gt/:id" element={<GTViewPage />} />
                     <Route path="/operations/ic" element={<ICListPage />} />
                     <Route path="/operations/ic/create" element={<ICCreatePage />} />
+                    <Route path="/operations/ic/:id" element={<ICViewPage />} />
                     <Route path="/operations/pa" element={<PutawayListPage />} />
                     <Route path="/operations/pa/create" element={<PutawayCreatePage />} />
 
