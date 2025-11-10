@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, masterDataClient } from '../lib/supabase'; // Import the new client
+import { supabase } from '../lib/supabase';
 import useAuthStore from '../stores/authStore';
 import { Database } from '../types/supabase';
 
@@ -28,7 +28,7 @@ export function useUserProfile() {
       setLoading(true);
       setError(null);
       try {
-        // First, fetch the user's base profile from the public.users table.
+        // Fetch the user's base profile from the public.users table.
         const { data: userProfileData, error: userProfileError } = await supabase
           .from('users')
           .select('*')
@@ -40,32 +40,19 @@ export function useUserProfile() {
           throw userProfileError;
         }
 
-        let organization_uuid: string | null = null;
-        
-        // Then, attempt to fetch the organization UUID. This might fail due to RLS.
-        // Instead of throwing a fatal error, we'll handle it gracefully.
-        const { data: orgData, error: orgError } = await masterDataClient
-          .from('organizations')
-          .select('id')
-          .limit(1)
-          .single();
-        
-        if (orgError) {
-          // Log a warning for debugging but don't crash the app.
-          const warningMessage = "No organizations found in master.organizations. Cannot determine user's organization UUID. This is likely an RLS policy issue or an empty table.";
-          console.warn(`Warning in useUserProfile: ${warningMessage} (Supabase error: ${orgError.message})`);
-          setError(warningMessage); // Set error state for components to optionally display.
-        } else if (orgData) {
-          organization_uuid = orgData.id;
-        }
-
-        // Combine the data into the new augmented profile object.
+        // The user's organization ID is directly available on their profile.
+        // We augment the profile with an `organization_uuid` property for consistency with other parts of the app.
         if (userProfileData) {
-          setProfile({ ...userProfileData, organization_uuid });
+          const augmentedProfile: AugmentedUserProfile = {
+            ...userProfileData,
+            organization_uuid: userProfileData.organization_id || null,
+          };
+          setProfile(augmentedProfile);
+        } else {
+            setProfile(null);
         }
 
       } catch (err: any) {
-        // This will now primarily catch errors from the user profile fetch.
         console.error('Error fetching user profile:', err);
         setError(err.message);
         setProfile(null);

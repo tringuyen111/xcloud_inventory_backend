@@ -7,6 +7,7 @@ import { warehouseAPI, branchAPI } from '../../../utils/apiClient';
 import { Database } from '../../../types/supabase';
 import dayjs from 'dayjs';
 import type { TableProps } from 'antd';
+import Can from '../../../components/auth/Can';
 
 type Warehouse = Database['master']['Tables']['warehouses']['Row'];
 type Branch = Database['master']['Tables']['branches']['Row'];
@@ -59,7 +60,9 @@ const WarehousesListPage: React.FC = () => {
       render: (_: any, record: Warehouse) => (
         <Space size="middle">
           <Tooltip title="View Details"><Button type="text" icon={<EyeOutlined />} onClick={() => navigate(`/master-data/warehouses/${record.id}`)} /></Tooltip>
-          <Tooltip title="Edit"><Button type="text" icon={<EditOutlined />} onClick={() => navigate(`/master-data/warehouses/${record.id}/edit`)} /></Tooltip>
+          <Can module="masterData" action="edit">
+            <Tooltip title="Edit"><Button type="text" icon={<EditOutlined />} onClick={() => navigate(`/master-data/warehouses/${record.id}/edit`)} /></Tooltip>
+          </Can>
         </Space>
       ),
     },
@@ -136,9 +139,11 @@ const WarehousesListPage: React.FC = () => {
             <Space>
                 {columnSelector}
                 <Button icon={<FileExcelOutlined />}>Export</Button>
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/warehouses/create')}>
-                    Create
-                </Button>
+                <Can module="masterData" action="create">
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/warehouses/create')}>
+                      Create
+                  </Button>
+                </Can>
             </Space>
         }
     >

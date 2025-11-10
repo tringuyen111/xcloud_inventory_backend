@@ -1,47 +1,40 @@
-
-
 import React, { useEffect, useState, useMemo } from 'react';
-import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, DatePicker, Dropdown, Menu, Checkbox } from 'antd';
+import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, DatePicker } from 'antd';
 import { EyeOutlined, PlusOutlined, FileExcelOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useDebounce } from '../../../hooks/useDebounce';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
-import { goodsIssueAPI, warehouseAPI, partnerAPI } from '../../../utils/apiClient';
+import { inventoryCountAPI, warehouseAPI } from '../../../utils/apiClient';
 import { Database } from '../../../types/supabase';
 
 dayjs.extend(isBetween);
 const { RangePicker } = DatePicker;
 
-type GoodsIssue = Database['transactions']['Tables']['gi_header']['Row'];
+type InventoryCount = Database['transactions']['Tables']['ic_header']['Row'];
 type Warehouse = Database['master']['Tables']['warehouses']['Row'];
-type Partner = Database['master']['Tables']['partners']['Row'];
 
-const GI_STATUSES: GoodsIssue['status'][] = ['DRAFT', 'WAITING_FOR_APPROVAL', 'CREATED', 'PICKING', 'PICKED', 'COMPLETED', 'CANCELLED'];
+const IC_STATUSES: InventoryCount['status'][] = ['DRAFT', 'CREATED', 'COUNTING', 'COMPLETED', 'CANCELLED'];
 
-const getStatusColor = (status: GoodsIssue['status']) => {
+const getStatusColor = (status: InventoryCount['status']) => {
   switch (status) {
     case 'DRAFT': return 'default';
-    case 'WAITING_FOR_APPROVAL': return 'warning';
     case 'CREATED': return 'processing';
-    case 'PICKING': return 'blue';
-    case 'PICKED': return 'purple';
+    case 'COUNTING': return 'blue';
     case 'COMPLETED': return 'success';
     case 'CANCELLED': return 'error';
     default: return 'default';
   }
 };
 
-const GIListPage: React.FC = () => {
-  const [allGiList, setAllGiList] = useState<GoodsIssue[]>([]);
+const ICListPage: React.FC = () => {
+  const [allIcList, setAllIcList] = useState<InventoryCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [warehouses, setWarehouses] = useState<Pick<Warehouse, 'id' | 'name'>[]>([]);
-  const [customers, setCustomers] = useState<Pick<Partner, 'id' | 'name'>[]>([]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [warehouseFilter, setWarehouseFilter] = useState<string[]>([]);
-  const [customerFilter, setCustomerFilter] = useState<string[]>([]);
   const [dateFilter, setDateFilter] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -49,53 +42,47 @@ const GIListPage: React.FC = () => {
   const { notification } = App.useApp();
   
   const warehousesMap = useMemo(() => new Map(warehouses.map(w => [w.id, w.name])), [warehouses]);
-  const customersMap = useMemo(() => new Map(customers.map(c => [c.id, c.name])), [customers]);
 
   const columns = useMemo(() => [
-    { title: 'GI Code', dataIndex: 'code', key: 'code', sorter: (a: GoodsIssue, b: GoodsIssue) => a.code.localeCompare(b.code) },
+    { title: 'IC Code', dataIndex: 'code', key: 'code', sorter: (a: InventoryCount, b: InventoryCount) => a.code.localeCompare(b.code) },
     { 
-      title: 'Document Date', 
-      dataIndex: 'document_date', 
-      key: 'document_date',
+      title: 'Count Date', 
+      dataIndex: 'count_date', 
+      key: 'count_date',
       render: (date: string) => date ? dayjs(date).format('YYYY-MM-DD') : 'N/A',
-      sorter: (a: GoodsIssue, b: GoodsIssue) => dayjs(a.document_date).unix() - dayjs(b.document_date).unix(),
+      sorter: (a: InventoryCount, b: InventoryCount) => dayjs(a.count_date).unix() - dayjs(b.count_date).unix(),
     },
     { title: 'Warehouse', dataIndex: 'warehouse_id', key: 'warehouse_id', render: (id: string) => warehousesMap.get(id) || 'N/A' },
-    { title: 'Customer', dataIndex: 'customer_id', key: 'customer_id', render: (id: string | null) => id ? customersMap.get(id) || 'N/A' : 'N/A' },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status: GoodsIssue['status']) => <Tag color={getStatusColor(status)}>{status}</Tag>,
+      render: (status: InventoryCount['status']) => <Tag color={getStatusColor(status)}>{status}</Tag>,
     },
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: GoodsIssue) => (
+      render: (_: any, record: InventoryCount) => (
         <Space size="middle">
           <Tooltip title="View Details">
-            <Button icon={<EyeOutlined />} onClick={() => navigate(`/operations/gi/${record.id}`)} />
+            <Button icon={<EyeOutlined />} onClick={() => navigate(`/operations/ic/${record.id}`)} />
           </Tooltip>
         </Space>
       ),
     },
-  ], [navigate, warehousesMap, customersMap]);
-
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => columns.map(c => c.key as string));
+  ], [navigate, warehousesMap]);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [giData, whData, partnerData] = await Promise.all([
-          goodsIssueAPI.list(),
+        const [icData, whData] = await Promise.all([
+          inventoryCountAPI.list(),
           warehouseAPI.list(),
-          partnerAPI.list()
         ]);
 
-        setAllGiList(giData || []);
+        setAllIcList(icData || []);
         setWarehouses(whData || []);
-        setCustomers(partnerData.filter(p => p.is_customer) || []);
       } catch (error: any) {
         notification.error({ message: 'Error fetching data', description: error.message });
       } finally {
@@ -105,8 +92,8 @@ const GIListPage: React.FC = () => {
     fetchData();
   }, [notification]);
 
-  const filteredGiList = useMemo(() => {
-    let filtered = [...allGiList];
+  const filteredIcList = useMemo(() => {
+    let filtered = [...allIcList];
     if (debouncedSearchTerm) {
       filtered = filtered.filter(item =>
         item.code.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
@@ -118,42 +105,20 @@ const GIListPage: React.FC = () => {
     if (warehouseFilter.length > 0) {
         filtered = filtered.filter(item => warehouseFilter.includes(item.warehouse_id));
     }
-    if (customerFilter.length > 0) {
-        filtered = filtered.filter(item => item.customer_id && customerFilter.includes(item.customer_id));
-    }
     if (dateFilter && dateFilter[0] && dateFilter[1]) {
         const [start, end] = dateFilter;
-        filtered = filtered.filter(item => dayjs(item.document_date).isBetween(start, end, 'day', '[]'));
+        filtered = filtered.filter(item => dayjs(item.count_date).isBetween(start, end, 'day', '[]'));
     }
     return filtered;
-  }, [debouncedSearchTerm, statusFilter, warehouseFilter, customerFilter, dateFilter, allGiList]);
+  }, [debouncedSearchTerm, statusFilter, warehouseFilter, dateFilter, allIcList]);
   
-  const columnSelector = (
-    <Dropdown
-      overlay={
-        <Menu>
-          <Checkbox.Group
-            className="flex flex-col p-2"
-            options={columns.map(({ key, title }) => ({ label: title as string, value: key as string }))}
-            value={visibleColumns}
-            onChange={(values) => setVisibleColumns(values as string[])}
-          />
-        </Menu>
-      }
-      trigger={['click']}
-    >
-      <Button icon={<EyeOutlined />}>Columns</Button>
-    </Dropdown>
-  );
-
   return (
     <Card
-      title="Goods Issues"
+      title="Inventory Counts"
       extra={
         <Space>
-          {columnSelector}
           <Button icon={<FileExcelOutlined />}>Export</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/gi/create')}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/ic/create')}>
             Create
           </Button>
         </Space>
@@ -163,7 +128,7 @@ const GIListPage: React.FC = () => {
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={8}>
             <Input.Search 
-              placeholder="Search by GI code..." 
+              placeholder="Search by IC code..." 
               onSearch={setSearchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               allowClear
@@ -176,7 +141,7 @@ const GIListPage: React.FC = () => {
                   style={{ width: '100%' }}
                   placeholder="Filter by status..."
                   onChange={setStatusFilter}
-                  options={GI_STATUSES.map(status => ({ label: status, value: status }))}
+                  options={IC_STATUSES.map(status => ({ label: status, value: status }))}
               />
           </Col>
            <Col xs={24} sm={12} md={8}>
@@ -192,21 +157,11 @@ const GIListPage: React.FC = () => {
                   options={warehouses.map(w => ({ label: w.name, value: w.id }))}
               />
           </Col>
-          <Col xs={24} sm={12} md={8}>
-              <Select
-                  mode="multiple"
-                  allowClear
-                  style={{ width: '100%' }}
-                  placeholder="Filter by customer..."
-                  onChange={setCustomerFilter}
-                  options={customers.map(c => ({ label: c.name, value: c.id }))}
-              />
-          </Col>
         </Row>
         <Spin spinning={loading}>
           <Table 
-              dataSource={filteredGiList} 
-              columns={columns.filter(c => visibleColumns.includes(c.key as string))} 
+              dataSource={filteredIcList} 
+              columns={columns} 
               rowKey="id" 
               size="small" 
               bordered 
@@ -218,8 +173,8 @@ const GIListPage: React.FC = () => {
   );
 };
 
-const GIListPageWrapper: React.FC = () => (
-    <App><GIListPage /></App>
+const ICListPageWrapper: React.FC = () => (
+    <App><ICListPage /></App>
 );
 
-export default GIListPageWrapper;
+export default ICListPageWrapper;

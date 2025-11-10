@@ -17,14 +17,15 @@ type GoodsReceipt = Database['transactions']['Tables']['gr_header']['Row'];
 type Warehouse = Database['master']['Tables']['warehouses']['Row'];
 type Partner = Database['master']['Tables']['partners']['Row'];
 
-const GR_STATUSES: GoodsReceipt['status'][] = ['DRAFT', 'CREATED', 'RECEIVING', 'COMPLETED', 'CANCELLED'];
-const GR_TYPES: GoodsReceipt['gr_type'][] = ['STANDARD_PO', 'RETURN', 'TRANSFER', 'OTHER'];
+const GR_STATUSES: GoodsReceipt['status'][] = ['DRAFT', 'CREATED', 'RECEIVING', 'RECEIVED', 'COMPLETED', 'CANCELLED'];
+const GR_TYPES: GoodsReceipt['gr_type'][] = ['PURCHASE', 'TRANSFER_IN', 'ADJUSTMENT_IN', 'RETURN_IN', 'OTHER'];
 
 const getStatusColor = (status: GoodsReceipt['status']) => {
   switch (status) {
     case 'DRAFT': return 'default';
     case 'CREATED': return 'processing';
     case 'RECEIVING': return 'blue';
+    case 'RECEIVED': return 'purple';
     case 'COMPLETED': return 'success';
     case 'CANCELLED': return 'error';
     default: return 'default';

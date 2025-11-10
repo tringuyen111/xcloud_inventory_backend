@@ -15,12 +15,14 @@ type PutawayWithData = PutawayHeader & {
   grCode?: string;
 };
 
-const PUTAWAY_STATUSES: PutawayHeader['status'][] = ['DRAFT', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+// FIX: Replaced 'IN_PROGRESS' with 'MOVING' to match the valid enum values from the Supabase schema.
+const PUTAWAY_STATUSES: PutawayHeader['status'][] = ['DRAFT', 'MOVING', 'COMPLETED', 'CANCELLED'];
 
 const getStatusColor = (status: PutawayHeader['status']) => {
   switch (status) {
     case 'DRAFT': return 'default';
-    case 'IN_PROGRESS': return 'processing';
+    // FIX: Replaced 'IN_PROGRESS' with 'MOVING' to match the valid enum values from the Supabase schema.
+    case 'MOVING': return 'processing';
     case 'COMPLETED': return 'success';
     case 'CANCELLED': return 'error';
     default: return 'default';

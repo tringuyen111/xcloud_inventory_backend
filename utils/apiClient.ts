@@ -16,6 +16,7 @@ type OnhandItem = Database['inventory']['Tables']['onhand']['Row'];
 type GoodsReceipt = Database['transactions']['Tables']['gr_header']['Row'];
 type GoodsIssue = Database['transactions']['Tables']['gi_header']['Row'];
 type GoodsTransfer = Database['transactions']['Tables']['gt_header']['Row'];
+type InventoryCount = Database['transactions']['Tables']['ic_header']['Row'];
 type Putaway = Database['transactions']['Tables']['putaway_header']['Row'];
 
 /**
@@ -70,6 +71,7 @@ export const inventoryAPI = createApiMethods<OnhandItem>(inventoryClient, 'onhan
 export const goodsReceiptAPI = createApiMethods<GoodsReceipt>(transactionsClient, 'gr_header');
 export const goodsIssueAPI = createApiMethods<GoodsIssue>(transactionsClient, 'gi_header');
 export const goodsTransferAPI = createApiMethods<GoodsTransfer>(transactionsClient, 'gt_header');
+export const inventoryCountAPI = createApiMethods<InventoryCount>(transactionsClient, 'ic_header');
 export const putawayAPI = createApiMethods<Putaway>(transactionsClient, 'putaway_header');
 
 // Master Data (master schema)

@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { App, Card, Col, Row, Space, Spin, Statistic, Table, Tag, Typography, Alert } from 'antd';
 import { InboxOutlined, ShoppingCartOutlined, TruckOutlined, BoxPlotOutlined } from '@ant-design/icons';
-// FIX: Replaced the generic 'supabase' client with the schema-specific 'reportingClient' to correctly call RPCs in the reporting schema.
-import { reportingClient } from '../../lib/supabase';
+import { reportingClient, transactionsClient } from '../../lib/supabase';
 import dayjs from 'dayjs';
+import { useAuth } from '../../hooks/useAuth';
+import { ROLES } from '../../config/roles';
 
-// Updated data structure to match the get_recent_activities RPC response
 interface RecentActivity {
   key: string;
   documentNo: string;
-  type: 'Receipt' | 'Issue'; // Matches RPC return type
+  type: 'Receipt' | 'Issue';
   status: string;
   date: string;
 }
@@ -25,35 +25,70 @@ const DashboardPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const { notification } = App.useApp();
+    const { role } = useAuth();
+
+    const isDataEmpty = kpi.total_quantity_onhand === 0 && kpi.total_goods_count === 0 && kpi.total_receipts === 0 && kpi.total_issues === 0;
+    const mightBeRlsIssue = isDataEmpty && (role === ROLES.ADMIN || role === ROLES.WAREHOUSE_MANAGER);
 
     useEffect(() => {
         const fetchSummary = async () => {
             setLoading(true);
             setError(null);
             try {
-                // Fetch data using direct Supabase RPC calls.
-                // FIX: Explicitly call RPCs in the 'reporting' schema as they are not found in 'public'.
-                // Using the schema-specific client correctly targets the RPCs without needing an invalid 'schema' option.
-                const [countsRes, onhandRes, activitiesRes] = await Promise.all([
-                    reportingClient.rpc('get_dashboard_counts', {}),
-                    reportingClient.rpc('get_total_onhand', {}),
-                    reportingClient.rpc('get_recent_activities', { limit_count: 5 })
+                // FIX: Replaced `.single()` with a safer query to prevent crashes when the view returns no rows.
+                // The new approach fetches the result array and safely accesses the first element.
+                const [summaryRes, grRes, giRes] = await Promise.all([
+                    reportingClient.from('v_dashboard_summary').select('*'),
+                    transactionsClient.from('gr_header').select('code, status, created_at').order('created_at', { ascending: false }).limit(5),
+                    transactionsClient.from('gi_header').select('code, status, created_at').order('created_at', { ascending: false }).limit(5),
                 ]);
 
-                if (countsRes.error) throw new Error(`Failed to get counts: ${countsRes.error.message}`);
-                if (onhandRes.error) throw new Error(`Failed to get total onhand: ${onhandRes.error.message}`);
-                if (activitiesRes.error) throw new Error(`Failed to get recent activities: ${activitiesRes.error.message}`);
+                if (summaryRes.error) throw new Error(`Failed to get dashboard summary: ${summaryRes.error.message}`);
+                if (grRes.error) throw new Error(`Failed to get recent Goods Receipts: ${grRes.error.message}`);
+                if (giRes.error) throw new Error(`Failed to get recent Goods Issues: ${giRes.error.message}`);
                 
-                const countsData = countsRes.data?.[0];
+                // Safely access the first (and only expected) row from the summary view result.
+                const summaryData = summaryRes.data?.[0];
 
-                setKpi({
-                    total_quantity_onhand: onhandRes.data || 0,
-                    total_goods_count: countsData?.goods_count || 0,
-                    total_receipts: countsData?.receipts_count || 0,
-                    total_issues: countsData?.issues_count || 0,
-                });
+                if (summaryData) {
+                    setKpi({
+                        total_quantity_onhand: summaryData.total_quantity_onhand || 0,
+                        total_goods_count: summaryData.active_goods_models || 0,
+                        total_receipts: summaryData.gr_count_30d || 0,
+                        total_issues: summaryData.gi_count_30d || 0,
+                    });
+                } else {
+                    // If no data is returned, set KPIs to 0 to avoid display errors.
+                    setKpi({
+                        total_quantity_onhand: 0,
+                        total_goods_count: 0,
+                        total_receipts: 0,
+                        total_issues: 0,
+                    });
+                }
                 
-                setRecentActivities(activitiesRes.data || []);
+                // Combine and sort recent activities from GR and GI tables
+                const recentGRs = (grRes.data || []).map(item => ({
+                    key: `gr-${item.code}`,
+                    documentNo: item.code,
+                    type: 'Receipt' as const,
+                    status: item.status,
+                    date: item.created_at,
+                }));
+
+                const recentGIs = (giRes.data || []).map(item => ({
+                    key: `gi-${item.code}`,
+                    documentNo: item.code,
+                    type: 'Issue' as const,
+                    status: item.status,
+                    date: item.created_at,
+                }));
+
+                const combinedActivities = [...recentGRs, ...recentGIs]
+                    .sort((a, b) => dayjs(b.date).unix() - dayjs(a.date).unix())
+                    .slice(0, 5);
+
+                setRecentActivities(combinedActivities);
 
             } catch (err: any) {
                 setError(err.message);
@@ -108,6 +143,16 @@ const DashboardPage: React.FC = () => {
             </div>
 
             {error && <Alert message="Error" description={error} type="error" showIcon />}
+            
+            {mightBeRlsIssue && !loading && !error && (
+                 <Alert
+                    message="Dashboard Data is Empty"
+                    description="As an administrator, you are seeing no data. This is likely due to restrictive Row-Level Security (RLS) policies on the database. Please ask your DBA to verify the SELECT policies for `v_dashboard_summary`, `gr_header`, and `gi_header` for your role."
+                    type="warning"
+                    showIcon
+                />
+            )}
+
 
             <Spin spinning={loading}>
                 <Row gutter={[16, 16]}>

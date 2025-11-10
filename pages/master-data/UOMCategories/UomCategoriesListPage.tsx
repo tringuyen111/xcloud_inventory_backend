@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { uomCategoryAPI } from '../../../utils/apiClient';
 import { Database } from '../../../types/supabase';
+import Can from '../../../components/auth/Can';
 
 const { RangePicker } = DatePicker;
 
@@ -40,7 +41,9 @@ const UomCategoriesListPage: React.FC = () => {
       render: (_: any, record: UomCategory) => (
         <Space size="middle">
           <Tooltip title="View Details"><Button icon={<EyeOutlined />} onClick={() => navigate(`/master-data/uom-categories/${record.id}`)} /></Tooltip>
-          <Tooltip title="Edit"><Button icon={<EditOutlined />} onClick={() => navigate(`/master-data/uom-categories/${record.id}/edit`)} /></Tooltip>
+          <Can module="masterData" action="edit">
+            <Tooltip title="Edit"><Button icon={<EditOutlined />} onClick={() => navigate(`/master-data/uom-categories/${record.id}/edit`)} /></Tooltip>
+          </Can>
         </Space>
       ),
     },
@@ -103,7 +106,9 @@ const UomCategoriesListPage: React.FC = () => {
             <Space>
                 {columnSelector}
                 <Button icon={<FileExcelOutlined />}>Export</Button>
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/uom-categories/create')}>Create</Button>
+                <Can module="masterData" action="create">
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/uom-categories/create')}>Create</Button>
+                </Can>
             </Space>
         }
     >

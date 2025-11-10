@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { partnerAPI } from '../../../utils/apiClient';
 import { Database } from '../../../types/supabase';
+import Can from '../../../components/auth/Can';
 
 const { RangePicker } = DatePicker;
 
@@ -56,7 +57,9 @@ const PartnersListPage: React.FC = () => {
       render: (_: any, record: Partner) => (
         <Space size="middle">
           <Tooltip title="View Details"><Button icon={<EyeOutlined />} onClick={() => navigate(`/master-data/partners/${record.id}`)} /></Tooltip>
-          <Tooltip title="Edit"><Button icon={<EditOutlined />} onClick={() => navigate(`/master-data/partners/${record.id}/edit`)} /></Tooltip>
+          <Can module="masterData" action="edit">
+            <Tooltip title="Edit"><Button icon={<EditOutlined />} onClick={() => navigate(`/master-data/partners/${record.id}/edit`)} /></Tooltip>
+          </Can>
         </Space>
       ),
     },
@@ -129,7 +132,9 @@ const PartnersListPage: React.FC = () => {
             <Space>
                 {columnSelector}
                 <Button icon={<FileExcelOutlined />}>Export</Button>
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/partners/create')}>Create</Button>
+                <Can module="masterData" action="create">
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/partners/create')}>Create</Button>
+                </Can>
             </Space>
         }
     >

@@ -1,9 +1,8 @@
-
-
 import React, { useState } from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import useUIStore from '../../stores/uiStore';
-import useAuthStore from '../../stores/authStore';
+import { useAuth } from '../../hooks/useAuth';
+import Can from '../auth/Can';
 
 interface TopbarProps {
   onLogout: () => void;
@@ -23,7 +22,10 @@ const VNFlagIcon = () => (
 const Topbar: React.FC<TopbarProps> = ({ onLogout }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
-  const user = useAuthStore((state) => state.user);
+  const { profile, isLoading } = useAuth();
+
+  const displayName = profile?.full_name || profile?.email || 'User';
+  const avatarName = profile?.full_name || profile?.email || 'U';
 
   return (
     <header className="bg-white shadow-sm z-10 h-16 flex items-center justify-between px-6 flex-shrink-0">
@@ -55,10 +57,23 @@ const Topbar: React.FC<TopbarProps> = ({ onLogout }) => {
             
             <div className="relative">
                 <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center space-x-2 focus:outline-none p-1 rounded-lg">
-                    <img className="h-9 w-9 rounded-full" src={`https://ui-avatars.com/api/?name=${user?.email || 'User'}&background=random`} alt="User avatar" />
+                    {isLoading ? (
+                        <div className="h-9 w-9 rounded-full bg-gray-300 animate-pulse"></div>
+                    ) : (
+                        <img className="h-9 w-9 rounded-full" src={`https://ui-avatars.com/api/?name=${avatarName}&background=random`} alt="User avatar" />
+                    )}
                     <div className="text-left hidden md:block">
-                        <div className="font-semibold text-sm text-gray-800">{user?.email?.split('@')[0] || 'User'}</div>
-                        <div className="text-xs text-gray-500">Administrator</div>
+                        {isLoading ? (
+                            <div className="space-y-1">
+                                <div className="h-4 w-24 bg-gray-300 rounded animate-pulse"></div>
+                                <div className="h-3 w-16 bg-gray-300 rounded animate-pulse"></div>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="font-semibold text-sm text-gray-800">{displayName}</div>
+                                <div className="text-xs text-gray-500">{profile?.role || '...'}</div>
+                            </>
+                        )}
                     </div>
                 </button>
                 {dropdownOpen && (
@@ -66,8 +81,10 @@ const Topbar: React.FC<TopbarProps> = ({ onLogout }) => {
                         className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-xl z-20"
                         onMouseLeave={() => setDropdownOpen(false)}
                     >
-                        <a href="#profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
-                        <a href="#settings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+                        <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</Link>
+                        <Can module="navigation" action="viewSettings">
+                            <Link to="/settings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</Link>
+                        </Can>
                         <div className="border-t border-gray-100"></div>
                         <button
                             onClick={onLogout}

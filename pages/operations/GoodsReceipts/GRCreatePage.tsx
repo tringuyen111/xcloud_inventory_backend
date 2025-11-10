@@ -118,7 +118,7 @@ const GRCreatePage: React.FC = () => {
             const createdHeader = await goodsReceiptAPI.create(headerPayload);
             if (!createdHeader?.id) throw new Error("Failed to create Goods Receipt header.");
 
-            const linesPayload: GRLineInsert[] = lines.map(line => {
+            const linesPayload: GRLineInsert[] = lines.map((line, index) => {
                 const model = goodsModelsMap.get(line.goods_model_id!);
                 if (!model) throw new Error(`Details for model ID ${line.goods_model_id} not found.`);
                 return {
@@ -127,6 +127,7 @@ const GRCreatePage: React.FC = () => {
                     uom_id: model.base_uom_id,
                     quantity_expected: line.quantity_expected || 0,
                     quantity_received: 0,
+                    line_number: index + 1,
                 };
             });
 
@@ -237,12 +238,13 @@ const GRCreatePage: React.FC = () => {
                     </Row>
                     <Row gutter={16}>
                         <Col span={8}>
-                             <Form.Item name="gr_type" label="GR Type" rules={[{ required: true }]} initialValue="STANDARD_PO">
+                             <Form.Item name="gr_type" label="GR Type" rules={[{ required: true }]} initialValue="PURCHASE">
                                 <Select
                                     options={[
-                                        { value: 'STANDARD_PO', label: 'Standard PO' },
-                                        { value: 'RETURN', label: 'Return' },
-                                        { value: 'TRANSFER', label: 'Transfer' },
+                                        { value: 'PURCHASE', label: 'Standard PO' },
+                                        { value: 'TRANSFER_IN', label: 'Transfer In' },
+                                        { value: 'ADJUSTMENT_IN', label: 'Adjustment In' },
+                                        { value: 'RETURN_IN', label: 'Return In' },
                                         { value: 'OTHER', label: 'Other' }
                                     ]}
                                 />

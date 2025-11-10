@@ -19,11 +19,11 @@ const Footer: React.FC = () => {
 
 const AppLayout: React.FC<AppLayoutProps> = ({ children, onLogout }) => {
   return (
-    <div className="flex h-screen bg-[#F3F3F9]">
+    <div className="flex h-screen bg-white">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar onLogout={onLogout} />
-        <div className="flex-1 flex flex-col overflow-y-auto">
+        <div className="flex-1 flex flex-col overflow-y-auto bg-white">
             <main className="flex-1 p-6">
               <Breadcrumb />
               {children}

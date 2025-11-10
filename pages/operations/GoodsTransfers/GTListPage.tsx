@@ -1,47 +1,42 @@
-
-
 import React, { useEffect, useState, useMemo } from 'react';
-import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, DatePicker, Dropdown, Menu, Checkbox } from 'antd';
+import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, DatePicker } from 'antd';
 import { EyeOutlined, PlusOutlined, FileExcelOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useDebounce } from '../../../hooks/useDebounce';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
-import { goodsIssueAPI, warehouseAPI, partnerAPI } from '../../../utils/apiClient';
+import { goodsTransferAPI, warehouseAPI } from '../../../utils/apiClient';
 import { Database } from '../../../types/supabase';
 
 dayjs.extend(isBetween);
 const { RangePicker } = DatePicker;
 
-type GoodsIssue = Database['transactions']['Tables']['gi_header']['Row'];
+type GoodsTransfer = Database['transactions']['Tables']['gt_header']['Row'];
 type Warehouse = Database['master']['Tables']['warehouses']['Row'];
-type Partner = Database['master']['Tables']['partners']['Row'];
 
-const GI_STATUSES: GoodsIssue['status'][] = ['DRAFT', 'WAITING_FOR_APPROVAL', 'CREATED', 'PICKING', 'PICKED', 'COMPLETED', 'CANCELLED'];
+const GT_STATUSES: GoodsTransfer['status'][] = ['DRAFT', 'CREATED', 'IN_PROGRESS', 'IN_TRANSIT', 'RECEIVING', 'COMPLETED', 'CANCELLED'];
 
-const getStatusColor = (status: GoodsIssue['status']) => {
+const getStatusColor = (status: GoodsTransfer['status']) => {
   switch (status) {
     case 'DRAFT': return 'default';
-    case 'WAITING_FOR_APPROVAL': return 'warning';
     case 'CREATED': return 'processing';
-    case 'PICKING': return 'blue';
-    case 'PICKED': return 'purple';
+    case 'IN_PROGRESS': return 'blue';
+    case 'IN_TRANSIT': return 'purple';
+    case 'RECEIVING': return 'orange';
     case 'COMPLETED': return 'success';
     case 'CANCELLED': return 'error';
     default: return 'default';
   }
 };
 
-const GIListPage: React.FC = () => {
-  const [allGiList, setAllGiList] = useState<GoodsIssue[]>([]);
+const GTListPage: React.FC = () => {
+  const [allGtList, setAllGtList] = useState<GoodsTransfer[]>([]);
   const [loading, setLoading] = useState(true);
   const [warehouses, setWarehouses] = useState<Pick<Warehouse, 'id' | 'name'>[]>([]);
-  const [customers, setCustomers] = useState<Pick<Partner, 'id' | 'name'>[]>([]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [warehouseFilter, setWarehouseFilter] = useState<string[]>([]);
-  const [customerFilter, setCustomerFilter] = useState<string[]>([]);
   const [dateFilter, setDateFilter] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -49,53 +44,48 @@ const GIListPage: React.FC = () => {
   const { notification } = App.useApp();
   
   const warehousesMap = useMemo(() => new Map(warehouses.map(w => [w.id, w.name])), [warehouses]);
-  const customersMap = useMemo(() => new Map(customers.map(c => [c.id, c.name])), [customers]);
 
   const columns = useMemo(() => [
-    { title: 'GI Code', dataIndex: 'code', key: 'code', sorter: (a: GoodsIssue, b: GoodsIssue) => a.code.localeCompare(b.code) },
+    { title: 'GT Code', dataIndex: 'code', key: 'code', sorter: (a: GoodsTransfer, b: GoodsTransfer) => a.code.localeCompare(b.code) },
     { 
       title: 'Document Date', 
       dataIndex: 'document_date', 
       key: 'document_date',
       render: (date: string) => date ? dayjs(date).format('YYYY-MM-DD') : 'N/A',
-      sorter: (a: GoodsIssue, b: GoodsIssue) => dayjs(a.document_date).unix() - dayjs(b.document_date).unix(),
+      sorter: (a: GoodsTransfer, b: GoodsTransfer) => dayjs(a.document_date).unix() - dayjs(b.document_date).unix(),
     },
-    { title: 'Warehouse', dataIndex: 'warehouse_id', key: 'warehouse_id', render: (id: string) => warehousesMap.get(id) || 'N/A' },
-    { title: 'Customer', dataIndex: 'customer_id', key: 'customer_id', render: (id: string | null) => id ? customersMap.get(id) || 'N/A' : 'N/A' },
+    { title: 'From Warehouse', dataIndex: 'from_warehouse_id', key: 'from_warehouse_id', render: (id: string) => warehousesMap.get(id) || 'N/A' },
+    { title: 'To Warehouse', dataIndex: 'to_warehouse_id', key: 'to_warehouse_id', render: (id: string) => warehousesMap.get(id) || 'N/A' },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status: GoodsIssue['status']) => <Tag color={getStatusColor(status)}>{status}</Tag>,
+      render: (status: GoodsTransfer['status']) => <Tag color={getStatusColor(status)}>{status}</Tag>,
     },
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: GoodsIssue) => (
+      render: (_: any, record: GoodsTransfer) => (
         <Space size="middle">
           <Tooltip title="View Details">
-            <Button icon={<EyeOutlined />} onClick={() => navigate(`/operations/gi/${record.id}`)} />
+            <Button icon={<EyeOutlined />} onClick={() => navigate(`/operations/gt/${record.id}`)} />
           </Tooltip>
         </Space>
       ),
     },
-  ], [navigate, warehousesMap, customersMap]);
-
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => columns.map(c => c.key as string));
+  ], [navigate, warehousesMap]);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [giData, whData, partnerData] = await Promise.all([
-          goodsIssueAPI.list(),
+        const [gtData, whData] = await Promise.all([
+          goodsTransferAPI.list(),
           warehouseAPI.list(),
-          partnerAPI.list()
         ]);
 
-        setAllGiList(giData || []);
+        setAllGtList(gtData || []);
         setWarehouses(whData || []);
-        setCustomers(partnerData.filter(p => p.is_customer) || []);
       } catch (error: any) {
         notification.error({ message: 'Error fetching data', description: error.message });
       } finally {
@@ -105,8 +95,8 @@ const GIListPage: React.FC = () => {
     fetchData();
   }, [notification]);
 
-  const filteredGiList = useMemo(() => {
-    let filtered = [...allGiList];
+  const filteredGtList = useMemo(() => {
+    let filtered = [...allGtList];
     if (debouncedSearchTerm) {
       filtered = filtered.filter(item =>
         item.code.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
@@ -116,44 +106,22 @@ const GIListPage: React.FC = () => {
         filtered = filtered.filter(item => statusFilter.includes(item.status));
     }
     if (warehouseFilter.length > 0) {
-        filtered = filtered.filter(item => warehouseFilter.includes(item.warehouse_id));
-    }
-    if (customerFilter.length > 0) {
-        filtered = filtered.filter(item => item.customer_id && customerFilter.includes(item.customer_id));
+        filtered = filtered.filter(item => warehouseFilter.includes(item.from_warehouse_id) || warehouseFilter.includes(item.to_warehouse_id));
     }
     if (dateFilter && dateFilter[0] && dateFilter[1]) {
         const [start, end] = dateFilter;
         filtered = filtered.filter(item => dayjs(item.document_date).isBetween(start, end, 'day', '[]'));
     }
     return filtered;
-  }, [debouncedSearchTerm, statusFilter, warehouseFilter, customerFilter, dateFilter, allGiList]);
+  }, [debouncedSearchTerm, statusFilter, warehouseFilter, dateFilter, allGtList]);
   
-  const columnSelector = (
-    <Dropdown
-      overlay={
-        <Menu>
-          <Checkbox.Group
-            className="flex flex-col p-2"
-            options={columns.map(({ key, title }) => ({ label: title as string, value: key as string }))}
-            value={visibleColumns}
-            onChange={(values) => setVisibleColumns(values as string[])}
-          />
-        </Menu>
-      }
-      trigger={['click']}
-    >
-      <Button icon={<EyeOutlined />}>Columns</Button>
-    </Dropdown>
-  );
-
   return (
     <Card
-      title="Goods Issues"
+      title="Goods Transfers"
       extra={
         <Space>
-          {columnSelector}
           <Button icon={<FileExcelOutlined />}>Export</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/gi/create')}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/gt/create')}>
             Create
           </Button>
         </Space>
@@ -163,7 +131,7 @@ const GIListPage: React.FC = () => {
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={8}>
             <Input.Search 
-              placeholder="Search by GI code..." 
+              placeholder="Search by GT code..." 
               onSearch={setSearchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               allowClear
@@ -176,7 +144,7 @@ const GIListPage: React.FC = () => {
                   style={{ width: '100%' }}
                   placeholder="Filter by status..."
                   onChange={setStatusFilter}
-                  options={GI_STATUSES.map(status => ({ label: status, value: status }))}
+                  options={GT_STATUSES.map(status => ({ label: status, value: status }))}
               />
           </Col>
            <Col xs={24} sm={12} md={8}>
@@ -192,21 +160,11 @@ const GIListPage: React.FC = () => {
                   options={warehouses.map(w => ({ label: w.name, value: w.id }))}
               />
           </Col>
-          <Col xs={24} sm={12} md={8}>
-              <Select
-                  mode="multiple"
-                  allowClear
-                  style={{ width: '100%' }}
-                  placeholder="Filter by customer..."
-                  onChange={setCustomerFilter}
-                  options={customers.map(c => ({ label: c.name, value: c.id }))}
-              />
-          </Col>
         </Row>
         <Spin spinning={loading}>
           <Table 
-              dataSource={filteredGiList} 
-              columns={columns.filter(c => visibleColumns.includes(c.key as string))} 
+              dataSource={filteredGtList} 
+              columns={columns} 
               rowKey="id" 
               size="small" 
               bordered 
@@ -218,8 +176,8 @@ const GIListPage: React.FC = () => {
   );
 };
 
-const GIListPageWrapper: React.FC = () => (
-    <App><GIListPage /></App>
+const GTListPageWrapper: React.FC = () => (
+    <App><GTListPage /></App>
 );
 
-export default GIListPageWrapper;
+export default GTListPageWrapper;

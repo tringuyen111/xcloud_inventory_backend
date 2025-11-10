@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { goodsTypeAPI } from '../../../utils/apiClient';
 import { Database } from '../../../types/supabase';
+import Can from '../../../components/auth/Can';
 
 type GoodsType = Database['master']['Tables']['goods_types']['Row'];
 
@@ -62,7 +63,9 @@ const GoodsTypesListPage: React.FC = () => {
       render: (_: any, record: GoodsType) => (
         <Space size="middle">
           <Tooltip title="View Details"><Button icon={<EyeOutlined />} onClick={() => navigate(`/master-data/goods-types/${record.id}`)} /></Tooltip>
-          <Tooltip title="Edit"><Button icon={<EditOutlined />} onClick={() => navigate(`/master-data/goods-types/${record.id}/edit`)} /></Tooltip>
+          <Can module="masterData" action="edit">
+            <Tooltip title="Edit"><Button icon={<EditOutlined />} onClick={() => navigate(`/master-data/goods-types/${record.id}/edit`)} /></Tooltip>
+          </Can>
         </Space>
       ),
     },
@@ -153,7 +156,9 @@ const GoodsTypesListPage: React.FC = () => {
             <Space>
                 {columnSelector}
                 <Button icon={<FileExcelOutlined />}>Export</Button>
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/goods-types/create')}>Create</Button>
+                <Can module="masterData" action="create">
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/goods-types/create')}>Create</Button>
+                </Can>
             </Space>
         }
     >

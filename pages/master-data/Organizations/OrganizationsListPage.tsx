@@ -7,6 +7,7 @@ import { organizationAPI } from '../../../utils/apiClient';
 import type { TableProps } from 'antd';
 import dayjs from 'dayjs';
 import { Database } from '../../../types/supabase';
+import Can from '../../../components/auth/Can';
 
 type Organization = Database['master']['Tables']['organizations']['Row'];
 
@@ -48,7 +49,9 @@ const OrganizationsListPage: React.FC = () => {
       render: (_, record: Organization) => (
         <Space size="middle">
           <Tooltip title="View Details"><Button type="text" icon={<EyeOutlined />} onClick={() => navigate(`/master-data/organizations/${record.id}`)} /></Tooltip>
-          <Tooltip title="Edit"><Button type="text" icon={<EditOutlined />} onClick={() => navigate(`/master-data/organizations/${record.id}/edit`)} /></Tooltip>
+          <Can module="masterData" action="edit">
+            <Tooltip title="Edit"><Button type="text" icon={<EditOutlined />} onClick={() => navigate(`/master-data/organizations/${record.id}/edit`)} /></Tooltip>
+          </Can>
         </Space>
       ),
     },
@@ -116,9 +119,11 @@ const OrganizationsListPage: React.FC = () => {
         <Space>
           {columnSelector}
           <Button icon={<FileExcelOutlined />}>Export</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/organizations/create')}>
-            Create
-          </Button>
+          <Can module="masterData" action="create">
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/organizations/create')}>
+              Create
+            </Button>
+          </Can>
         </Space>
       }
     >
