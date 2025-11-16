@@ -49,6 +49,8 @@ type ProductViewData = {
   base_uom_name: string;
   sku: string | null;
   created_at: string;
+  updated_at: string;
+  updated_by_name: string | null;
 };
 
 // Type for product type data for filter dropdown
@@ -75,7 +77,7 @@ const GoodsModelsListPage: React.FC = () => {
     const [columnPopoverVisible, setColumnPopoverVisible] = useState(false);
     const [productTypes, setProductTypes] = useState<ProductTypeFilterData[]>([]);
 
-    const defaultColumns = ['code', 'name', 'is_active', 'product_type_name', 'tracking_type', 'base_uom_name', 'created_at', 'actions'];
+    const defaultColumns = ['code', 'name', 'is_active', 'product_type_name', 'tracking_type', 'base_uom_name', 'sku', 'created_at', 'updated_at', 'updated_by_name', 'actions'];
     const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns);
 
     // Fetch product types for the filter dropdown
@@ -171,8 +173,10 @@ const GoodsModelsListPage: React.FC = () => {
         { title: 'Loại sản phẩm', dataIndex: 'product_type_name', key: 'product_type_name', sorter: true },
         { title: 'Loại tracking', dataIndex: 'tracking_type', key: 'tracking_type', sorter: true, render: trackingTypeTag },
         { title: 'ĐVT Cơ bản', dataIndex: 'base_uom_name', key: 'base_uom_name' },
-        { title: 'SKU', dataIndex: 'sku', key: 'sku', sorter: true },
+        { title: 'SKU', dataIndex: 'sku', key: 'sku', sorter: true, render: (text) => text || 'N/A' },
         { title: 'Ngày tạo', dataIndex: 'created_at', key: 'created_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
+        { title: 'Ngày cập nhật', dataIndex: 'updated_at', key: 'updated_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY HH:mm') : '-' },
+        { title: 'Người cập nhật', dataIndex: 'updated_by_name', key: 'updated_by_name', render: (text) => text || 'N/A' },
         {
             title: 'Hành động',
             key: 'actions',

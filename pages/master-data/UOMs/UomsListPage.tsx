@@ -47,6 +47,8 @@ type UomViewData = {
   is_base_unit: boolean;
   conversion_factor: number;
   created_at: string;
+  updated_at: string;
+  updated_by_name: string | null;
 };
 
 // Type for UOM category data for filter dropdown
@@ -73,7 +75,7 @@ const UomsListPage: React.FC = () => {
     const [columnPopoverVisible, setColumnPopoverVisible] = useState(false);
     const [uomCategories, setUomCategories] = useState<UomCategoryFilterData[]>([]);
 
-    const defaultColumns = ['code', 'name', 'is_active', 'category_name', 'is_base_unit', 'conversion_factor', 'created_at', 'actions'];
+    const defaultColumns = ['code', 'name', 'is_active', 'category_name', 'is_base_unit', 'conversion_factor', 'created_at', 'updated_at', 'updated_by_name', 'actions'];
     const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns);
 
     // Fetch UOM Categories for the filter dropdown
@@ -165,6 +167,8 @@ const UomsListPage: React.FC = () => {
         { title: 'Đơn vị gốc', dataIndex: 'is_base_unit', key: 'is_base_unit', render: (val: boolean) => <Tag color={val ? 'blue' : 'default'}>{val ? 'Yes' : 'No'}</Tag> },
         { title: 'Tỷ lệ chuyển đổi', dataIndex: 'conversion_factor', key: 'conversion_factor' },
         { title: 'Ngày tạo', dataIndex: 'created_at', key: 'created_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
+        { title: 'Ngày cập nhật', dataIndex: 'updated_at', key: 'updated_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY HH:mm') : '-' },
+        { title: 'Người cập nhật', dataIndex: 'updated_by_name', key: 'updated_by_name', render: (text: string | null) => text || 'N/A' },
         {
             title: 'Hành động',
             key: 'actions',

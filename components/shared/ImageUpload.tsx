@@ -20,16 +20,25 @@ const getFileUrl = (file: UploadFile): string | undefined => {
 };
 
 // Extracts the file path from a full Supabase public URL
-// e.g., https://.../public/products/public/some-user/image.png -> public/some-user/image.png
+// e.g., https://.../storage/v1/object/public/inventory/products/image.png -> products/image.png
 const getPathFromUrl = (url: string, bucket: string): string => {
     try {
         const urlObject = new URL(url);
-        const searchString = `/public/${bucket}/`;
+        // Supabase public URL path looks like: /storage/v1/object/public/<bucket-name>/<file-path>
+        const searchString = `/storage/v1/object/public/${bucket}/`;
         const startIndex = urlObject.pathname.indexOf(searchString);
+        
         if (startIndex === -1) {
-            console.warn("Could not extract path from URL:", url);
+            console.warn(`Could not find '${searchString}' in URL path:`, urlObject.pathname);
+            // Provide a fallback in case the URL structure is different
+            const fallbackPath = url.split(`/${bucket}/`)[1];
+            if (fallbackPath) {
+                return decodeURIComponent(fallbackPath);
+            }
             return '';
         }
+        
+        // Extract the path after the bucket name
         return decodeURIComponent(urlObject.pathname.substring(startIndex + searchString.length));
     } catch (error) {
         console.error("Invalid URL for path extraction:", url, error);
@@ -37,7 +46,7 @@ const getPathFromUrl = (url: string, bucket: string): string => {
     }
 };
 
-const ImageUploadComponent: React.FC<ImageUploadProps> = ({ value = [], onChange, maxCount = 5, bucket = 'products' }) => {
+const ImageUploadComponent: React.FC<ImageUploadProps> = ({ value = [], onChange, maxCount = 5, bucket = 'inventory' }) => {
     const { notification } = App.useApp();
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewImage, setPreviewImage] = useState('');
@@ -45,21 +54,25 @@ const ImageUploadComponent: React.FC<ImageUploadProps> = ({ value = [], onChange
     const [fileList, setFileList] = useState<UploadFile[]>([]);
 
     // Sync from form value (value prop) to internal fileList state
+    // This effect should only run when the `value` prop from the form changes.
     useEffect(() => {
         const formUrls = new Set(value);
         const stateUrls = new Set(fileList.map(getFileUrl).filter(Boolean));
 
-        // If the sets of URLs are different, sync the state from the prop
-        if (formUrls.size !== stateUrls.size || ![...formUrls].every(url => stateUrls.has(url))) {
-            const newFileList = value.map((url, index) => ({
-                uid: `${url}-${index}`, // Make UID more unique to the URL
-                name: url.substring(url.lastIndexOf('/') + 1),
-                status: 'done' as const,
-                url: url,
-            }));
-            setFileList(newFileList);
+        // Prevent re-render if the state is already in sync with the prop
+        if (formUrls.size === stateUrls.size && [...formUrls].every(url => stateUrls.has(url))) {
+            return;
         }
-    }, [value, fileList]);
+
+        const newFileList = value.map((url, index) => ({
+            uid: `${url}-${index}`,
+            name: url.substring(url.lastIndexOf('/') + 1),
+            status: 'done' as const,
+            url: url,
+        }));
+        setFileList(newFileList);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [value]);
 
     const handleCancel = () => setPreviewOpen(false);
 
@@ -108,7 +121,7 @@ const ImageUploadComponent: React.FC<ImageUploadProps> = ({ value = [], onChange
         const rcFile = file as RcFile;
         // Create a more unique file name to avoid collisions
         const fileName = `${Date.now()}-${rcFile.name.replace(/\s/g, '_')}`;
-        const filePath = `public/${fileName}`;
+        const filePath = `products/${fileName}`;
 
         try {
             const { error } = await supabase.storage

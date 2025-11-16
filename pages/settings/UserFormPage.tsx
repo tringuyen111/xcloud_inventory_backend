@@ -32,7 +32,7 @@ const UserFormPage: React.FC = () => {
     const navigate = useNavigate();
     const [form] = Form.useForm();
     const { notification } = App.useApp();
-    const { user: currentUser } = useAuth();
+    const { session } = useAuth();
 
     const [loading, setLoading] = useState<boolean>(false);
     const [submitting, setSubmitting] = useState<boolean>(false);
@@ -139,54 +139,49 @@ const UserFormPage: React.FC = () => {
     const onFinish = async (values: any) => {
         setSubmitting(true);
         
+        if (!session) {
+            notification.error({ message: 'Authentication Error', description: 'No active session found. Please log in again.' });
+            setSubmitting(false);
+            return;
+        }
+
         try {
             if (isEditMode) {
-                // Call update RPC for existing users
-                const { error } = await supabase.rpc('update_user_with_permissions', {
-                    p_user_id: id,
-                    p_full_name: values.full_name,
-                    p_phone: values.phone || null,
-                    p_role_id: values.role_id ? parseInt(values.role_id, 10) : null,
-                    p_organization_id: values.organization_id ? parseInt(values.organization_id, 10) : null,
-                    p_warehouse_id: values.warehouse_id ? parseInt(values.warehouse_id, 10) : null,
-                    p_branch_id: values.branch_id ? parseInt(values.branch_id, 10) : null,
+                // Call update Edge Function for existing users
+                const { error } = await supabase.functions.invoke('update-user-details', {
+                    headers: {
+                        Authorization: `Bearer ${session.access_token}`,
+                    },
+                    body: {
+                        user_id: id,
+                        full_name: values.full_name,
+                        phone: values.phone || null,
+                        role_id: values.role_id ? parseInt(values.role_id, 10) : null,
+                        organization_id: values.organization_id ? parseInt(values.organization_id, 10) : null,
+                        warehouse_id: values.warehouse_id ? parseInt(values.warehouse_id, 10) : null,
+                    }
                 });
                 if (error) throw error;
+
             } else {
-                // Step 1: Call Edge Function to securely create the auth user
-                notification.info({ message: 'Step 1/2: Creating authentication user...' });
-
-                const { data: authData, error: authError } = await supabase.functions.invoke('create-auth-user', {
-                    body: { email: values.email, password: values.password },
+                // Call create Edge Function for new users
+                const { data, error } = await supabase.functions.invoke('create-auth-user', {
+                    headers: {
+                        Authorization: `Bearer ${session.access_token}`,
+                    },
+                    body: { 
+                        email: values.email,
+                        password: values.password,
+                        full_name: values.full_name,
+                        phone: values.phone || null,
+                        role_id: values.role_id ? parseInt(values.role_id, 10) : null,
+                        organization_id: values.organization_id ? parseInt(values.organization_id, 10) : null,
+                        warehouse_id: values.warehouse_id ? parseInt(values.warehouse_id, 10) : null,
+                    },
                 });
 
-                if (authError) throw authError;
-                if (authData.error) throw new Error(authData.error);
-                
-                const newUserId = authData.user_id;
-                if (!newUserId) {
-                    throw new Error('Không thể tạo user auth. Email có thể đã tồn tại.');
-                }
-                
-                // Step 2: Call RPC to sync profile and assign permissions
-                notification.info({ message: 'Step 2/2: Syncing profile and permissions...' });
-
-                const { error: rpcError } = await supabase.rpc('sync_and_assign_user_permissions', {
-                    p_new_user_id: newUserId,
-                    p_full_name: values.full_name,
-                    p_email: values.email,
-                    p_phone: values.phone || null,
-                    p_role_id: parseInt(values.role_id, 10),
-                    p_organization_id: values.organization_id ? parseInt(values.organization_id, 10) : null,
-                    p_warehouse_id: values.warehouse_id ? parseInt(values.warehouse_id, 10) : null,
-                    p_branch_id: values.branch_id ? parseInt(values.branch_id, 10) : null,
-                    p_created_by: currentUser?.id,
-                });
-
-                if (rpcError) {
-                    // Optional: Consider adding rollback logic here (e.g., delete the auth user)
-                    throw new Error(`Lỗi đồng bộ: ${rpcError.message}`);
-                }
+                if (error) throw error;
+                if (data.error) throw new Error(data.error);
             }
             
             notification.success({ message: `Người dùng đã được ${isEditMode ? 'cập nhật' : 'tạo'} thành công` });
