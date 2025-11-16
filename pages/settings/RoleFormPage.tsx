@@ -42,6 +42,8 @@ type RoleDetails = {
 type Permission = {
     id: number;
     code: string;
+    action: string;
+    description: string | null;
     is_assigned: boolean;
 };
 
@@ -77,28 +79,37 @@ const RoleFormPage: React.FC = () => {
     useEffect(() => {
         const currentRoleId = Number(id);
         if (!id || isNaN(currentRoleId)) {
-            if (id !== undefined) { // Avoid error on initial render
+            if (id !== undefined) { 
                 notification.error({ message: 'Invalid Role ID', description: 'No valid role ID was provided in the URL.' });
                 navigate('/settings/roles');
             }
+            setLoading(false);
             return;
         }
 
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [roleDetailRes, permissionsRes, modulesRes] = await Promise.all([
+                // Fetch role details and permissions in parallel.
+                const requests: any[] = [
                     supabase.from('roles').select('*').eq('id', currentRoleId).single(),
-                    supabase.rpc('get_permissions_for_role', { p_role_id: currentRoleId, p_module: moduleFilter || undefined }),
+                    supabase.rpc('get_permissions_for_role', { 
+                        p_role_id: currentRoleId, 
+                        p_module: moduleFilter || undefined,
+                        p_search_text: debouncedSearchTerm || undefined,
+                    }),
                     supabase.rpc('get_distinct_permission_modules')
-                ]);
+                ];
+
+                const [roleDetailRes, permissionsRes, modulesRes] = await Promise.all(requests);
                 
                 if (roleDetailRes.error) throw roleDetailRes.error;
                 setRoleDetails(roleDetailRes.data);
                 detailsForm.setFieldsValue(roleDetailRes.data);
 
                 if (permissionsRes.error) throw permissionsRes.error;
-                setPermissionsByModule(permissionsRes.data || []);
+                const permissionsData = permissionsRes.data?.data || [];
+                setPermissionsByModule(Array.isArray(permissionsData) ? permissionsData : []);
 
                 if (modulesRes.error) throw modulesRes.error;
                 setDistinctModules((modulesRes.data || []).map((m: {module: string}) => m.module).sort());
@@ -112,49 +123,26 @@ const RoleFormPage: React.FC = () => {
         };
 
         fetchData();
-    }, [id, moduleFilter, navigate, notification, detailsForm]);
+    }, [id, moduleFilter, debouncedSearchTerm, navigate, notification, detailsForm]);
 
-    // Derived state for filtered data with robust checks
-    const filteredData = useMemo(() => {
-        if (!debouncedSearchTerm) {
-            return permissionsByModule;
-        }
-        const lowercasedFilter = debouncedSearchTerm.toLowerCase();
-
-        if (!Array.isArray(permissionsByModule)) {
-            return [];
-        }
-
-        return permissionsByModule.filter(item => {
-            if (!item || typeof item !== 'object') {
-                return false;
-            }
-
-            const moduleMatch = item.module && typeof item.module === 'string' && item.module.toLowerCase().includes(lowercasedFilter);
-            
-            const permissionsMatch = Array.isArray(item.permissions) && item.permissions.some(p => 
-                p && p.code && typeof p.code === 'string' && p.code.toLowerCase().includes(lowercasedFilter)
-            );
-            
-            return moduleMatch || permissionsMatch;
-        });
-    }, [debouncedSearchTerm, permissionsByModule]);
-
-    const handleSwitchChange = async (checked: boolean, permissionId: number) => {
+    const handleSwitchChange = useCallback(async (checked: boolean, permissionId: number) => {
         const currentRoleId = Number(id);
         if (isNaN(currentRoleId)) return;
 
         setUpdatingSwitch({ permissionId });
         
-        const originalData = JSON.parse(JSON.stringify(permissionsByModule));
-        setPermissionsByModule(prev => 
-            prev.map(mod => ({
+        let originalData: ModulePermissions[] | null = null;
+
+        setPermissionsByModule(prev => {
+            originalData = JSON.parse(JSON.stringify(prev));
+            if (!Array.isArray(prev)) return [];
+            return prev.map(mod => ({
                 ...mod,
                 permissions: Array.isArray(mod.permissions) ? mod.permissions.map(perm => 
                     perm.id === permissionId ? { ...perm, is_assigned: checked } : perm
                 ) : null,
-            }))
-        );
+            }));
+        });
 
         try {
             const { error } = await supabase.rpc('set_role_permission', { 
@@ -165,11 +153,13 @@ const RoleFormPage: React.FC = () => {
             if (error) throw error;
         } catch (error: any) {
             notification.error({ message: 'Failed to update permission', description: error.message });
-            setPermissionsByModule(originalData); // Revert on error
+            if (originalData) {
+                setPermissionsByModule(originalData); // Revert on error
+            }
         } finally {
             setUpdatingSwitch(null);
         }
-    };
+    }, [id, notification]);
 
     const onFinish = async (values: any) => {
         const currentRoleId = Number(id);
@@ -222,28 +212,21 @@ const RoleFormPage: React.FC = () => {
             align: 'center',
             width: 120,
             render: (_, record: ModulePermissions) => {
-                if (!record || typeof record.module !== 'string') {
-                    return <Switch disabled size="small" />;
-                }
-
-                const permissionCode = `${record.module}.${action}`;
                 const perm = Array.isArray(record.permissions)
-                    ? record.permissions.find(p => p && p.code === permissionCode)
+                    ? record.permissions.find(p => p && p.action === action)
                     : undefined;
-
+                
                 if (!perm) {
                     return <Switch disabled size="small" />;
                 }
 
                 const isUpdating = updatingSwitch?.permissionId === perm.id;
-                const isAdmin = roleDetails?.code === 'ADMIN';
 
                 return (
-                    <Tooltip title={perm.code}>
+                    <Tooltip title={perm.description || perm.code}>
                         <Switch
-                            checked={isAdmin || perm.is_assigned}
+                            checked={perm.is_assigned}
                             loading={isUpdating}
-                            disabled={isAdmin}
                             size="small"
                             onChange={(checked) => handleSwitchChange(checked, perm.id)}
                         />
@@ -253,7 +236,7 @@ const RoleFormPage: React.FC = () => {
         }));
 
         return [staticColumn, ...dynamicActionColumns];
-    }, [updatingSwitch, roleDetails, handleSwitchChange]);
+    }, [updatingSwitch, handleSwitchChange]);
 
     const advancedFilterForm = (
         <div style={{ padding: 16, width: 300 }}>
@@ -270,63 +253,93 @@ const RoleFormPage: React.FC = () => {
         </div>
     );
 
+
     return (
-        <Spin spinning={loading}>
-            <Form form={detailsForm} layout="vertical" onFinish={onFinish}>
-                <Card className="mb-6">
-                    <Row gutter={24} align="middle" justify="space-between">
-                        <Col>
+        <div className="pb-20">
+            <Spin spinning={loading && !permissionsByModule.length}>
+                <Form form={detailsForm} layout="vertical" onFinish={onFinish}>
+                    <Card
+                        title={
                             <Typography.Title level={4} style={{ margin: 0 }}>
                                 Edit Role: {roleDetails?.name || 'Loading...'}
                             </Typography.Title>
-                        </Col>
-                        <Col>
-                            <Space>
-                                <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/settings/roles')}>Back</Button>
-                                <Button type="primary" icon={<SaveOutlined />} htmlType="submit" loading={submitting} disabled={roleDetails?.is_system}>Save Details</Button>
-                            </Space>
-                        </Col>
-                    </Row>
-                    <Row gutter={24} className="mt-4">
-                        <Col xs={24} md={6}><Form.Item name="code" label="Code"><Input disabled /></Form.Item></Col>
-                        <Col xs={24} md={6}><Form.Item name="name" label="Name" rules={[{required: true}]}><Input disabled={roleDetails?.is_system} /></Form.Item></Col>
-                        <Col xs={24} md={8}><Form.Item name="description" label="Description"><Input disabled={roleDetails?.is_system} /></Form.Item></Col>
-                        <Col xs={24} md={4}><Form.Item name="is_active" label="Status" valuePropName="checked"><Switch disabled={roleDetails?.is_system} /></Form.Item></Col>
-                    </Row>
-                </Card>
-            </Form>
-            
-            <Card title="Permissions">
-                <div className="flex justify-between items-center mb-4">
-                    <Space>
-                        <Popover content={advancedFilterForm} trigger="click" placement="bottomLeft" visible={filterPopoverVisible} onVisibleChange={setFilterPopoverVisible}>
-                            <Tooltip title="Filter by Module"><Button icon={<FilterOutlined />} /></Tooltip>
-                        </Popover>
-                        <Input
-                            placeholder="Search by module or permission code..."
-                            prefix={<SearchOutlined />}
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            style={{ width: 300 }}
-                            allowClear
+                        }
+                        className="mb-6"
+                    >
+                        <Row gutter={24}>
+                            <Col xs={24} md={6}>
+                                <Form.Item name="code" label="Code">
+                                    <Input disabled />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={6}>
+                                <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+                                    <Input />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={8}>
+                                <Form.Item name="description" label="Description">
+                                    <Input />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={4}>
+                                <Form.Item name="is_active" label="Status" valuePropName="checked">
+                                    <Switch />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    </Card>
+                </Form>
+                
+                <Card title="Permissions">
+                    <div className="flex justify-between items-center mb-4">
+                        <Space>
+                            <Popover content={advancedFilterForm} trigger="click" placement="bottomLeft" visible={filterPopoverVisible} onVisibleChange={setFilterPopoverVisible}>
+                                <Tooltip title="Filter by Module"><Button icon={<FilterOutlined />} /></Tooltip>
+                            </Popover>
+                            <Input
+                                placeholder="Search by module or permission code..."
+                                prefix={<SearchOutlined />}
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                style={{ width: 300 }}
+                                allowClear
+                            />
+                        </Space>
+                    </div>
+                    <div className="modern-table-container">
+                        <Table
+                            rowKey="module"
+                            columns={columns}
+                            dataSource={permissionsByModule}
+                            loading={loading}
+                            pagination={false}
+                            scroll={{ x: 'max-content' }}
+                            className="custom-scrollbar"
+                            bordered
+                            size="small"
                         />
-                    </Space>
-                </div>
-                <div className="modern-table-container">
-                    <Table
-                        rowKey="module"
-                        columns={columns}
-                        dataSource={filteredData}
-                        loading={loading}
-                        pagination={false}
-                        scroll={{ x: 'max-content' }}
-                        className="custom-scrollbar"
-                        bordered
-                        size="small"
-                    />
-                </div>
-            </Card>
-        </Spin>
+                    </div>
+                </Card>
+            </Spin>
+
+            <div className="sticky bottom-0 right-0 w-full bg-white p-4 border-t flex justify-end z-10">
+                <Space>
+                    <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/settings/roles')}>
+                        Back
+                    </Button>
+                    <Button 
+                        type="primary" 
+                        icon={<SaveOutlined />} 
+                        loading={submitting} 
+                        onClick={() => detailsForm.submit()}
+                        disabled={submitting}
+                    >
+                        Save Details
+                    </Button>
+                </Space>
+            </div>
+        </div>
     );
 };
 

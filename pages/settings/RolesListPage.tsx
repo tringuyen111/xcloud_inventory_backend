@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -28,7 +30,6 @@ import {
     FilterOutlined,
     SettingOutlined,
     ExclamationCircleFilled,
-    SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import { supabase } from '../../lib/supabase';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -60,7 +61,6 @@ const RolesListPage: React.FC = () => {
     const navigate = useNavigate();
     const { notification } = App.useApp();
     const [filterForm] = Form.useForm();
-    const [editForm] = Form.useForm();
     const [createForm] = Form.useForm();
 
     const [roles, setRoles] = useState<RoleViewData[]>([]);
@@ -75,9 +75,7 @@ const RolesListPage: React.FC = () => {
     const [filterPopoverVisible, setFilterPopoverVisible] = useState(false);
     const [columnPopoverVisible, setColumnPopoverVisible] = useState(false);
 
-    const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
-    const [editingRole, setEditingRole] = useState<RoleViewData | null>(null);
     const [isSubmittingModal, setIsSubmittingModal] = useState(false);
 
     const defaultColumns = ['code', 'name', 'is_active', 'is_system', 'user_count', 'created_at', 'actions'];
@@ -123,21 +121,6 @@ const RolesListPage: React.FC = () => {
         fetchRoles();
     }, [fetchRoles]);
 
-    const showEditModal = (role: RoleViewData) => {
-        setEditingRole(role);
-        editForm.setFieldsValue({
-            name: role.name,
-            description: role.description,
-        });
-        setIsEditModalVisible(true);
-    };
-
-    const handleEditModalCancel = () => {
-        setIsEditModalVisible(false);
-        setEditingRole(null);
-        editForm.resetFields();
-    };
-
     const handleCreateModalCancel = () => {
         setIsCreateModalVisible(false);
         createForm.resetFields();
@@ -169,28 +152,6 @@ const RolesListPage: React.FC = () => {
             fetchRoles(); // Refresh data
         } catch (error: any) {
             notification.error({ message: 'Failed to create role', description: error.message });
-        } finally {
-            setIsSubmittingModal(false);
-        }
-    };
-
-    const handleEditModalOk = async () => {
-        try {
-            if (!editingRole || editingRole.is_system) return;
-            const values = await editForm.validateFields();
-            setIsSubmittingModal(true);
-            const { error } = await supabase
-                .from('roles')
-                .update({ name: values.name, description: values.description })
-                .eq('id', editingRole.id);
-
-            if (error) throw error;
-
-            notification.success({ message: 'Role updated successfully' });
-            handleEditModalCancel();
-            fetchRoles(); // Refresh data
-        } catch (error: any) {
-            notification.error({ message: 'Failed to update role', description: error.message });
         } finally {
             setIsSubmittingModal(false);
         }
@@ -267,18 +228,13 @@ const RolesListPage: React.FC = () => {
                  <Space size="small">
                     <Can module="settings" action="manageUsers">
                         <>
-                            <Tooltip title="Sửa thông tin">
-                                <button className="table-action-button" onClick={() => showEditModal(record)}>
+                            <Tooltip title="Edit Details & Permissions">
+                                <button className="table-action-button" onClick={() => navigate(`/settings/roles/${record.id}/permissions`)}>
                                     <EditOutlined />
                                 </button>
                             </Tooltip>
-                            <Tooltip title="Phân Quyền">
-                                <button className="table-action-button" onClick={() => navigate(`/settings/roles/${record.id}/permissions`)}>
-                                    <SafetyCertificateOutlined />
-                                </button>
-                            </Tooltip>
                             {!record.is_system && (
-                                <Tooltip title="Xóa">
+                                <Tooltip title="Delete Role">
                                     <button className="table-action-button" onClick={() => handleDelete(record)}>
                                         <DeleteOutlined />
                                     </button>
@@ -289,7 +245,7 @@ const RolesListPage: React.FC = () => {
                 </Space>
             ),
         },
-    ], [navigate, fetchRoles]);
+    ], [navigate]);
 
     const columnToggler = (
         <div style={{ padding: 8, width: 200 }}>
@@ -419,42 +375,6 @@ const RolesListPage: React.FC = () => {
                     </Form.Item>
                 </Form>
             </Modal>
-
-            {/* Edit Modal */}
-            {editingRole && (
-                <Modal
-                    title={`Edit Role: ${editingRole.name}`}
-                    visible={isEditModalVisible}
-                    onCancel={handleEditModalCancel}
-                    destroyOnClose
-                    footer={[
-                        <Button key="back" onClick={handleEditModalCancel}>
-                            {editingRole.is_system ? 'Close' : 'Cancel'}
-                        </Button>,
-                        !editingRole.is_system && (
-                            <Button key="submit" type="primary" loading={isSubmittingModal} onClick={handleEditModalOk}>
-                                Save
-                            </Button>
-                        ),
-                    ]}
-                >
-                    <Form form={editForm} layout="vertical" name="edit_role_form" className="mt-6">
-                        <Form.Item
-                            name="name"
-                            label="Role Name"
-                            rules={[{ required: true, message: 'Please input the role name!' }]}
-                        >
-                            <Input disabled={editingRole.is_system} />
-                        </Form.Item>
-                        <Form.Item
-                            name="description"
-                            label="Description"
-                        >
-                            <Input.TextArea rows={3} disabled={editingRole.is_system} />
-                        </Form.Item>
-                    </Form>
-                </Modal>
-            )}
         </>
     );
 };
