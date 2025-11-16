@@ -1767,7 +1767,6 @@ export type Database = {
       }
       products: {
         Row: {
-          barcode: string | null
           base_uom_id: number
           code: string
           created_at: string
@@ -1795,7 +1794,6 @@ export type Database = {
           weight_kg: number | null
         }
         Insert: {
-          barcode?: string | null
           base_uom_id: number
           code: string
           created_at?: string
@@ -1823,7 +1821,6 @@ export type Database = {
           weight_kg?: number | null
         }
         Update: {
-          barcode?: string | null
           base_uom_id?: number
           code?: string
           created_at?: string

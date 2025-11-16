@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -133,7 +134,7 @@ const GoodsTypesListPage: React.FC = () => {
           dataIndex: 'name',
           key: 'name',
           sorter: true,
-          render: (text: string, record: ProductTypeViewData) => <Link to={`/master-data/goods-types/${record.id}`}>{text}</Link>
+          render: (text: string, record: ProductTypeViewData) => <Link to={`/product/goods-types/${record.id}`}>{text}</Link>
         },
         { title: 'Trạng thái', dataIndex: 'is_active', key: 'is_active', sorter: true, render: (isActive: boolean) => <StatusTag status={isActive} /> },
         { title: 'Mô tả', dataIndex: 'description', key: 'description' },
@@ -148,13 +149,13 @@ const GoodsTypesListPage: React.FC = () => {
             render: (_: any, record: ProductTypeViewData) => (
                 <Space size="small">
                      <Tooltip title="Xem chi tiết">
-                        <button className="table-action-button" onClick={() => navigate(`/master-data/goods-types/${record.id}`)}>
+                        <button className="table-action-button" onClick={() => navigate(`/product/goods-types/${record.id}`)}>
                             <EyeOutlined />
                         </button>
                     </Tooltip>
                     <Can module="masterData" action="edit">
                         <Tooltip title="Chỉnh sửa">
-                            <button className="table-action-button" onClick={() => navigate(`/master-data/goods-types/${record.id}/edit`)}>
+                            <button className="table-action-button" onClick={() => navigate(`/product/goods-types/${record.id}/edit`)}>
                                 <EditOutlined />
                             </button>
                         </Tooltip>
@@ -202,7 +203,7 @@ const GoodsTypesListPage: React.FC = () => {
             <div className="flex justify-between items-center mb-6">
                 <Typography.Title level={4} style={{ margin: 0 }}>Product Types</Typography.Title>
                 <Can module="masterData" action="create">
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/goods-types/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/product/goods-types/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
                         Thêm mới Loại SP
                     </Button>
                 </Can>

@@ -16,7 +16,6 @@ const permissions = {
     viewMasterData: [ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER],
     viewReports: [ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER],
     viewSettings: [ROLES.ADMIN],
-    viewDeveloper: [ROLES.ADMIN],
     // Granular permissions for operations sub-menus
     viewGR: [ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER, ROLES.WAREHOUSE_STAFF],
     viewPA: [ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER, ROLES.WAREHOUSE_STAFF],

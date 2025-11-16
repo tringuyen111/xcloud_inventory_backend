@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -157,7 +158,7 @@ const UomsListPage: React.FC = () => {
           dataIndex: 'name',
           key: 'name',
           sorter: true,
-          render: (text: string, record: UomViewData) => <Link to={`/master-data/uoms/${record.id}`}>{text}</Link>
+          render: (text: string, record: UomViewData) => <Link to={`/product/uoms/${record.id}`}>{text}</Link>
         },
         { title: 'Trạng thái', dataIndex: 'is_active', key: 'is_active', sorter: true, render: (isActive: boolean) => <StatusTag status={isActive} /> },
         { title: 'Nhóm đơn vị', dataIndex: 'category_name', key: 'category_name', sorter: true },
@@ -173,13 +174,13 @@ const UomsListPage: React.FC = () => {
             render: (_: any, record: UomViewData) => (
                 <Space size="small">
                      <Tooltip title="Xem chi tiết">
-                        <button className="table-action-button" onClick={() => navigate(`/master-data/uoms/${record.id}`)}>
+                        <button className="table-action-button" onClick={() => navigate(`/product/uoms/${record.id}`)}>
                             <EyeOutlined />
                         </button>
                     </Tooltip>
                     <Can module="masterData" action="edit">
                         <Tooltip title="Chỉnh sửa">
-                            <button className="table-action-button" onClick={() => navigate(`/master-data/uoms/${record.id}/edit`)}>
+                            <button className="table-action-button" onClick={() => navigate(`/product/uoms/${record.id}/edit`)}>
                                 <EditOutlined />
                             </button>
                         </Tooltip>
@@ -243,7 +244,7 @@ const UomsListPage: React.FC = () => {
             <div className="flex justify-between items-center mb-6">
                 <Typography.Title level={4} style={{ margin: 0 }}>Units of Measure (UOMs)</Typography.Title>
                 <Can module="masterData" action="create">
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/uoms/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/product/uoms/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
                         Thêm mới Đơn vị
                     </Button>
                 </Can>

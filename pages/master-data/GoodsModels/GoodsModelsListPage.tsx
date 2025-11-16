@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -47,7 +48,6 @@ type ProductViewData = {
   tracking_type: Database['public']['Enums']['tracking_type_enum'];
   base_uom_name: string;
   sku: string | null;
-  barcode: string | null;
   created_at: string;
 };
 
@@ -165,14 +165,13 @@ const GoodsModelsListPage: React.FC = () => {
           dataIndex: 'name',
           key: 'name',
           sorter: true,
-          render: (text: string, record: ProductViewData) => <Link to={`/master-data/goods-models/${record.id}`}>{text}</Link>
+          render: (text: string, record: ProductViewData) => <Link to={`/product/goods-models/${record.id}`}>{text}</Link>
         },
         { title: 'Trạng thái', dataIndex: 'is_active', key: 'is_active', sorter: true, render: (isActive: boolean) => <StatusTag status={isActive} /> },
         { title: 'Loại sản phẩm', dataIndex: 'product_type_name', key: 'product_type_name', sorter: true },
         { title: 'Loại tracking', dataIndex: 'tracking_type', key: 'tracking_type', sorter: true, render: trackingTypeTag },
         { title: 'ĐVT Cơ bản', dataIndex: 'base_uom_name', key: 'base_uom_name' },
         { title: 'SKU', dataIndex: 'sku', key: 'sku', sorter: true },
-        { title: 'Barcode', dataIndex: 'barcode', key: 'barcode' },
         { title: 'Ngày tạo', dataIndex: 'created_at', key: 'created_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
         {
             title: 'Hành động',
@@ -183,13 +182,13 @@ const GoodsModelsListPage: React.FC = () => {
             render: (_: any, record: ProductViewData) => (
                 <Space size="small">
                      <Tooltip title="Xem chi tiết">
-                        <button className="table-action-button" onClick={() => navigate(`/master-data/goods-models/${record.id}`)}>
+                        <button className="table-action-button" onClick={() => navigate(`/product/goods-models/${record.id}`)}>
                             <EyeOutlined />
                         </button>
                     </Tooltip>
                     <Can module="masterData" action="edit">
                         <Tooltip title="Chỉnh sửa">
-                            <button className="table-action-button" onClick={() => navigate(`/master-data/goods-models/${record.id}/edit`)}>
+                            <button className="table-action-button" onClick={() => navigate(`/product/goods-models/${record.id}/edit`)}>
                                 <EditOutlined />
                             </button>
                         </Tooltip>
@@ -254,7 +253,7 @@ const GoodsModelsListPage: React.FC = () => {
             <div className="flex justify-between items-center mb-6">
                 <Typography.Title level={4} style={{ margin: 0 }}>Products</Typography.Title>
                 <Can module="masterData" action="create">
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/goods-models/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/product/goods-models/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
                         Thêm mới Sản phẩm
                     </Button>
                 </Can>

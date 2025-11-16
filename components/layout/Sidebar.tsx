@@ -1,5 +1,6 @@
 
 
+
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import useUIStore from '../../stores/uiStore';
@@ -55,13 +56,10 @@ const navItems: NavItem[] = [
         { name: 'Roles Management', path: '/settings/roles', icon: <div/> },
         { name: 'Lots & Serials', path: '/settings/lots-serials', icon: <div/> },
     ]},
-    { name: 'Developer', path: '/dev', icon: <CodeIcon />, subItems: [
-        { name: 'DB Schema', path: '/dev/db-schema', icon: <div/> },
-    ]},
 ];
 
 // FIX: Defined a specific type for navigation actions to match the expected signature of `hasPermission`.
-type NavigationAction = "viewDashboard" | "viewOperations" | "viewMasterData" | "viewReports" | "viewSettings" | "viewDeveloper" | "viewGR" | "viewPA" | "viewOnhand" | "viewIC" | "viewGI" | "viewGT" | "viewProduct";
+type NavigationAction = "viewDashboard" | "viewOperations" | "viewMasterData" | "viewReports" | "viewSettings" | "viewGR" | "viewPA" | "viewOnhand" | "viewIC" | "viewGI" | "viewGT" | "viewProduct";
 
 const permissionMap: Record<string, { module: 'navigation', action: NavigationAction }> = {
     '/dashboard': { module: 'navigation', action: 'viewDashboard' },
@@ -70,7 +68,6 @@ const permissionMap: Record<string, { module: 'navigation', action: NavigationAc
     '/master-data': { module: 'navigation', action: 'viewMasterData' },
     '/reports': { module: 'navigation', action: 'viewReports' },
     '/settings': { module: 'navigation', action: 'viewSettings' },
-    '/dev': { module: 'navigation', action: 'viewDeveloper' },
     // Sub-item permissions
     '/operations/gr': { module: 'navigation', action: 'viewGR' },
     '/operations/pa': { module: 'navigation', action: 'viewPA' },

@@ -1,5 +1,6 @@
 
 
+
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Spin, ConfigProvider, App as AntdApp } from 'antd';
@@ -78,10 +79,6 @@ import RoleFormPage from './pages/settings/RoleFormPage';
 import PermissionMatrixPage from './pages/settings/PermissionMatrixPage';
 import ProfilePage from './pages/settings/ProfilePage';
 import LotsSerialsListPage from './pages/settings/LotsSerialsListPage';
-
-
-import DbSchemaPage from './pages/dev/DbSchemaPage';
-import SupabaseMcpPage from './pages/dev/SupabaseMcpPage';
 
 
 // This component provides the main layout (sidebar, topbar) for all protected pages.
@@ -224,9 +221,6 @@ const App: React.FC = () => {
                     <Route path="/settings/roles/:id/permissions" element={<RouteGuard module="settings" action="manageUsers"><RoleFormPage /></RouteGuard>} />
                     <Route path="/settings/lots-serials" element={<RouteGuard module="navigation" action="viewSettings"><LotsSerialsListPage /></RouteGuard>} />
 
-                    
-                    <Route path="/dev/db-schema" element={<RouteGuard module="navigation" action="viewDeveloper"><DbSchemaPage /></RouteGuard>} />
-                    <Route path="/dev/supabase-mcp" element={<RouteGuard module="navigation" action="viewDeveloper"><SupabaseMcpPage /></RouteGuard>} />
                     
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Route>

@@ -9,10 +9,10 @@ import {
     Input,
     Row,
     Spin,
-    Switch,
     Typography,
+    Space,
 } from 'antd';
-import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons';
+import { SaveOutlined, PlusOutlined } from '@ant-design/icons';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../hooks/useAuth';
 
@@ -27,12 +27,13 @@ const OrganizationFormPage: React.FC = () => {
 
     const [loading, setLoading] = useState<boolean>(false);
     const [submitting, setSubmitting] = useState<boolean>(false);
-    const [organizationCode, setOrganizationCode] = useState<string>('');
+    const [pageTitle, setPageTitle] = useState<string>('Create New Organization');
     
     const isEditMode = !!id;
 
     useEffect(() => {
         if (isEditMode) {
+            setPageTitle('Edit Organization');
             const fetchOrganization = async () => {
                 setLoading(true);
                 const { data, error } = await supabase
@@ -48,11 +49,8 @@ const OrganizationFormPage: React.FC = () => {
                     });
                     navigate('/master-data/organizations');
                 } else if (data) {
-                    form.setFieldsValue({
-                        ...data,
-                        status: data.is_active,
-                    });
-                    setOrganizationCode(data.code);
+                    form.setFieldsValue(data);
+                    setPageTitle(`Edit Organization: ${data.code}`);
                 }
                 setLoading(false);
             };
@@ -62,10 +60,9 @@ const OrganizationFormPage: React.FC = () => {
 
     const onFinish = async (values: any) => {
         setSubmitting(true);
-        const { status, ...restValues } = values;
+        // The is_active field is removed from the form, DB will use its default value.
         const payload = {
-            ...restValues,
-            is_active: status,
+            ...values,
             ...(isEditMode 
                 ? { updated_by: user?.id, updated_at: new Date().toISOString() } 
                 : { created_by: user?.id })
@@ -91,105 +88,120 @@ const OrganizationFormPage: React.FC = () => {
             navigate('/master-data/organizations');
 
         } catch (error: any) {
-            notification.error({
-                message: `Failed to ${isEditMode ? 'update' : 'create'} organization`,
-                description: error.message,
-            });
+            if (error.code === '23505' && error.message.includes('organizations_code_key')) {
+                form.setFields([
+                   {
+                       name: 'code',
+                       errors: ['Mã tổ chức này đã tồn tại.'],
+                   },
+               ]);
+               notification.error({
+                   message: `Failed to create organization`,
+                   description: "Please use a different code.",
+               });
+           } else {
+               notification.error({
+                   message: `Failed to ${isEditMode ? 'update' : 'create'} organization`,
+                   description: error.message,
+               });
+           }
         } finally {
             setSubmitting(false);
         }
     };
 
-    const pageTitle = isEditMode ? `Edit Organization: ${organizationCode}` : 'Create New Organization';
-
-    const headerActions = (
-        <div className="flex items-center space-x-2">
-            <Button
-                icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/master-data/organizations')}
-            >
-                Back to List
-            </Button>
-            <Button
-                type="primary"
-                icon={<SaveOutlined />}
-                htmlType="submit"
-                loading={submitting}
-            >
-                Save
-            </Button>
-        </div>
-    );
-
     return (
-        <Spin spinning={loading}>
-            <Form
-                form={form}
-                layout="vertical"
-                onFinish={onFinish}
-                initialValues={{ status: true }}
-            >
-                <Card
-                    title={<Title level={4} style={{ margin: 0 }}>{pageTitle}</Title>}
-                    extra={headerActions}
+        <div className="pb-24">
+            <Spin spinning={loading}>
+                <Form
+                    id="organization-form"
+                    form={form}
+                    layout="vertical"
+                    onFinish={onFinish}
                 >
-                    <Row gutter={24}>
-                        <Col xs={24} md={12}>
-                            <Form.Item
-                                name="code"
-                                label="Organization Code"
-                                rules={[{ required: true, message: 'Code is required' }]}
-                            >
-                                <Input placeholder="e.g., ORG-001" disabled={isEditMode} />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                             <Form.Item
-                                name="name"
-                                label="Organization Name"
-                                rules={[{ required: true, message: 'Name is required' }]}
-                            >
-                                <Input placeholder="e.g., Main Distribution Inc." />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                            <Form.Item
-                                name="email"
-                                label="Email"
-                                rules={[{ type: 'email', message: 'Please enter a valid email' }]}
-                            >
-                                <Input placeholder="e.g., contact@organization.com" />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                            <Form.Item name="phone" label="Phone">
-                                <Input placeholder="e.g., (123) 456-7890" />
-                            </Form.Item>
-                        </Col>
-                        <Col xs={24} md={12}>
-                             <Form.Item name="tax_code" label="Tax Code">
-                                <Input placeholder="e.g., 1234567890" />
-                            </Form.Item>
-                        </Col>
-                         <Col xs={24} md={12}>
-                            <Form.Item name="status" label="Status" valuePropName="checked">
-                                <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
-                            </Form.Item>
-                        </Col>
-                        <Col span={24}>
-                            <Form.Item name="address" label="Address">
-                                <Input.TextArea rows={2} placeholder="Enter full address" />
-                            </Form.Item>
-                        </Col>
-                         <Col span={24}>
-                            <Form.Item name="notes" label="Notes">
-                                <Input.TextArea rows={3} placeholder="Any additional notes" />
-                            </Form.Item>
-                        </Col>
-                    </Row>
-                </Card>
-            </Form>
-        </Spin>
+                    <Card
+                        title={<Title level={4} style={{ margin: 0 }}>{pageTitle}</Title>}
+                    >
+                        <Row gutter={24}>
+                            <Col xs={24} md={12}>
+                                <Form.Item
+                                    name="code"
+                                    label="Organization Code"
+                                    rules={[
+                                        { required: true, message: 'Code is required' },
+                                        { min: 2, message: 'Code must be at least 2 characters' }
+                                    ]}
+                                >
+                                    <Input placeholder="e.g., ORG-001" disabled={isEditMode} />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                 <Form.Item
+                                    name="name"
+                                    label="Organization Name"
+                                    rules={[
+                                        { required: true, message: 'Name is required' },
+                                        { min: 2, message: 'Name must be at least 2 characters' }
+                                    ]}
+                                >
+                                    <Input placeholder="e.g., Main Distribution Inc." />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item
+                                    name="email"
+                                    label="Email"
+                                    rules={[{ type: 'email', message: 'Please enter a valid email' }]}
+                                >
+                                    <Input placeholder="e.g., contact@organization.com" />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Form.Item name="phone" label="Phone">
+                                    <Input placeholder="e.g., (123) 456-7890" />
+                                </Form.Item>
+                            </Col>
+                            <Col xs={24} md={12}>
+                                 <Form.Item name="tax_code" label="Tax Code">
+                                    <Input placeholder="e.g., 1234567890" />
+                                </Form.Item>
+                            </Col>
+                            {/* is_active field is removed as per requirements, DB defaults to true */}
+                            <Col span={24}>
+                                <Form.Item name="address" label="Address">
+                                    <Input.TextArea rows={2} placeholder="Enter full address" />
+                                </Form.Item>
+                            </Col>
+                             <Col span={24}>
+                                <Form.Item name="notes" label="Notes">
+                                    <Input.TextArea rows={3} placeholder="Any additional notes" />
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    </Card>
+                </Form>
+            </Spin>
+
+            {/* Floating sticky footer with transparent background */}
+            <div className="fixed bottom-6 right-6 z-50">
+                <Space>
+                    <Button
+                        onClick={() => navigate('/master-data/organizations')}
+                    >
+                        Hủy
+                    </Button>
+                    <Button
+                        type="primary"
+                        icon={isEditMode ? <SaveOutlined /> : <PlusOutlined />}
+                        htmlType="submit"
+                        loading={submitting}
+                        form="organization-form"
+                    >
+                        {isEditMode ? 'Lưu' : 'Tạo mới'}
+                    </Button>
+                </Space>
+            </div>
+        </div>
     );
 };
 

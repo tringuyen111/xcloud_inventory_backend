@@ -2,6 +2,8 @@
 
 
 
+
+
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { Breadcrumb as AntBreadcrumb } from 'antd';
@@ -33,9 +35,6 @@ const pathNameMapping: { [key: string]: string } = {
   roles: 'Roles Management',
   permissions: 'Assign Permissions',
   'lots-serials': 'Lots & Serials',
-  dev: 'Developer',
-  'db-schema': 'DB Schema',
-  'supabase-mcp': 'Supabase MCP',
 };
 
 const Breadcrumb: React.FC = () => {
