@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     App,
@@ -46,7 +47,7 @@ type Permission = {
 
 type ModulePermissions = {
     module: string;
-    permissions: Permission[];
+    permissions: Permission[] | null; // Can be null from DB
 };
 
 // Hardcoded actions for table columns, matching the specification
@@ -72,23 +73,23 @@ const RoleFormPage: React.FC = () => {
     const [moduleFilter, setModuleFilter] = useState<string | null>(null);
     const [filterPopoverVisible, setFilterPopoverVisible] = useState(false);
 
-    const roleId = Number(id);
-
     // Fetch all data for the role editing page
     useEffect(() => {
-        const fetchData = async () => {
-            if (!id || isNaN(roleId)) {
+        const currentRoleId = Number(id);
+        if (!id || isNaN(currentRoleId)) {
+            if (id !== undefined) { // Avoid error on initial render
                 notification.error({ message: 'Invalid Role ID', description: 'No valid role ID was provided in the URL.' });
                 navigate('/settings/roles');
-                return;
             }
-            
+            return;
+        }
+
+        const fetchData = async () => {
             setLoading(true);
             try {
-                // Fetch role details, all permissions for that role, and distinct module names in parallel
                 const [roleDetailRes, permissionsRes, modulesRes] = await Promise.all([
-                    supabase.from('roles').select('*').eq('id', roleId).single(),
-                    supabase.rpc('get_permissions_for_role', { p_role_id: roleId, p_module: moduleFilter || undefined }),
+                    supabase.from('roles').select('*').eq('id', currentRoleId).single(),
+                    supabase.rpc('get_permissions_for_role', { p_role_id: currentRoleId, p_module: moduleFilter || undefined }),
                     supabase.rpc('get_distinct_permission_modules')
                 ]);
                 
@@ -111,37 +112,53 @@ const RoleFormPage: React.FC = () => {
         };
 
         fetchData();
-    }, [id, roleId, moduleFilter, navigate, notification, detailsForm]);
+    }, [id, moduleFilter, navigate, notification, detailsForm]);
 
-    // Derived state for filtered data using useMemo for performance
+    // Derived state for filtered data with robust checks
     const filteredData = useMemo(() => {
         if (!debouncedSearchTerm) {
             return permissionsByModule;
         }
         const lowercasedFilter = debouncedSearchTerm.toLowerCase();
-        const filtered = permissionsByModule.filter(item => 
-            item.module.toLowerCase().includes(lowercasedFilter) ||
-            item.permissions.some(p => p.code.toLowerCase().includes(lowercasedFilter))
-        );
-        return filtered;
+
+        if (!Array.isArray(permissionsByModule)) {
+            return [];
+        }
+
+        return permissionsByModule.filter(item => {
+            if (!item || typeof item !== 'object') {
+                return false;
+            }
+
+            const moduleMatch = item.module && typeof item.module === 'string' && item.module.toLowerCase().includes(lowercasedFilter);
+            
+            const permissionsMatch = Array.isArray(item.permissions) && item.permissions.some(p => 
+                p && p.code && typeof p.code === 'string' && p.code.toLowerCase().includes(lowercasedFilter)
+            );
+            
+            return moduleMatch || permissionsMatch;
+        });
     }, [debouncedSearchTerm, permissionsByModule]);
 
     const handleSwitchChange = async (checked: boolean, permissionId: number) => {
+        const currentRoleId = Number(id);
+        if (isNaN(currentRoleId)) return;
+
         setUpdatingSwitch({ permissionId });
-        // Optimistic update
+        
         const originalData = JSON.parse(JSON.stringify(permissionsByModule));
         setPermissionsByModule(prev => 
             prev.map(mod => ({
                 ...mod,
-                permissions: mod.permissions.map(perm => 
+                permissions: Array.isArray(mod.permissions) ? mod.permissions.map(perm => 
                     perm.id === permissionId ? { ...perm, is_assigned: checked } : perm
-                )
+                ) : null,
             }))
         );
 
         try {
             const { error } = await supabase.rpc('set_role_permission', { 
-                p_role_id: roleId, 
+                p_role_id: currentRoleId, 
                 p_permission_id: permissionId, 
                 p_is_assigned: checked 
             });
@@ -155,17 +172,18 @@ const RoleFormPage: React.FC = () => {
     };
 
     const onFinish = async (values: any) => {
+        const currentRoleId = Number(id);
+        if (isNaN(currentRoleId)) return;
+        
         setSubmitting(true);
         try {
             const { error } = await supabase
                 .from('roles')
                 .update({ name: values.name, description: values.description, is_active: values.is_active })
-                .eq('id', roleId);
+                .eq('id', currentRoleId);
             if (error) throw error;
             notification.success({ message: 'Role details updated successfully!' });
-            // Refetch data by updating a dependency. We can refetch by just calling the effect's logic again.
-            // Let's call a subset of it, just for the role details.
-             const { data, error: roleError } = await supabase.from('roles').select('*').eq('id', roleId).single();
+            const { data, error: roleError } = await supabase.from('roles').select('*').eq('id', currentRoleId).single();
              if (roleError) throw roleError;
              setRoleDetails(data);
              detailsForm.setFieldsValue(data);
@@ -204,8 +222,14 @@ const RoleFormPage: React.FC = () => {
             align: 'center',
             width: 120,
             render: (_, record: ModulePermissions) => {
+                if (!record || typeof record.module !== 'string') {
+                    return <Switch disabled size="small" />;
+                }
+
                 const permissionCode = `${record.module}.${action}`;
-                const perm = record.permissions.find(p => p.code === permissionCode);
+                const perm = Array.isArray(record.permissions)
+                    ? record.permissions.find(p => p && p.code === permissionCode)
+                    : undefined;
 
                 if (!perm) {
                     return <Switch disabled size="small" />;
