@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -49,6 +50,8 @@ type PartnerViewData = {
   email: string | null;
   created_at: string;
   created_by_name: string | null;
+  updated_at: string;
+  updated_by_name: string | null;
 };
 
 const PartnersListPage: React.FC = () => {
@@ -68,7 +71,7 @@ const PartnersListPage: React.FC = () => {
     const [filterPopoverVisible, setFilterPopoverVisible] = useState(false);
     const [columnPopoverVisible, setColumnPopoverVisible] = useState(false);
 
-    const defaultColumns = ['code', 'name', 'is_active', 'type', 'phone', 'created_at', 'created_by_name', 'actions'];
+    const defaultColumns = ['code', 'name', 'is_active', 'type', 'phone', 'created_at', 'created_by_name', 'updated_at', 'updated_by_name', 'actions'];
     const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns);
 
     const fetchPartners = useCallback(async () => {
@@ -153,6 +156,8 @@ const PartnersListPage: React.FC = () => {
         { title: 'Email', dataIndex: 'email', key: 'email' },
         { title: 'Ngày tạo', dataIndex: 'created_at', key: 'created_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
         { title: 'Người tạo', dataIndex: 'created_by_name', key: 'created_by_name' },
+        { title: 'Ngày cập nhật', dataIndex: 'updated_at', key: 'updated_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY HH:mm') : '-' },
+        { title: 'Người cập nhật', dataIndex: 'updated_by_name', key: 'updated_by_name', render: (text: string | null) => text || 'N/A' },
         {
             title: 'Hành động',
             key: 'actions',

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -45,8 +46,11 @@ type LocationViewData = {
   warehouse_name: string;
   is_receiving_area: boolean;
   is_storage_area: boolean;
+  is_shipping_area: boolean;
   created_at: string;
   created_by_name: string | null;
+  updated_at: string;
+  updated_by_name: string | null;
 };
 
 // Type for warehouse data for filter dropdown
@@ -73,7 +77,7 @@ const LocationsListPage: React.FC = () => {
     const [columnPopoverVisible, setColumnPopoverVisible] = useState(false);
     const [warehouses, setWarehouses] = useState<WarehouseFilterData[]>([]);
 
-    const defaultColumns = ['code', 'name', 'is_active', 'warehouse_name', 'created_at', 'created_by_name', 'actions'];
+    const defaultColumns = ['code', 'name', 'is_active', 'warehouse_name', 'location_type', 'created_at', 'updated_at', 'updated_by_name', 'actions'];
     const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns);
 
     // Fetch warehouses for the filter dropdown
@@ -161,10 +165,20 @@ const LocationsListPage: React.FC = () => {
         },
         { title: 'Trạng thái', dataIndex: 'is_active', key: 'is_active', sorter: true, render: (isActive: boolean) => <StatusTag status={isActive} /> },
         { title: 'Kho', dataIndex: 'warehouse_name', key: 'warehouse_name', sorter: true },
-        { title: 'Vị trí nhận hàng', dataIndex: 'is_receiving_area', key: 'is_receiving_area', render: (val: boolean) => <Tag color={val ? 'cyan' : 'default'}>{val ? 'Yes' : 'No'}</Tag> },
-        { title: 'Vị trí lưu trữ', dataIndex: 'is_storage_area', key: 'is_storage_area', render: (val: boolean) => <Tag color={val ? 'blue' : 'default'}>{val ? 'Yes' : 'No'}</Tag> },
+        { 
+            title: 'Loại Vị trí', 
+            key: 'location_type', 
+            render: (_: any, record: LocationViewData) => {
+                if (record.is_receiving_area) return <Tag color="cyan">Receiving</Tag>;
+                if (record.is_shipping_area) return <Tag color="purple">Shipping</Tag>;
+                if (record.is_storage_area) return <Tag color="blue">Storage</Tag>;
+                return <Tag>N/A</Tag>;
+            } 
+        },
         { title: 'Ngày tạo', dataIndex: 'created_at', key: 'created_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
         { title: 'Người tạo', dataIndex: 'created_by_name', key: 'created_by_name' },
+        { title: 'Ngày cập nhật', dataIndex: 'updated_at', key: 'updated_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY HH:mm') : '-' },
+        { title: 'Người cập nhật', dataIndex: 'updated_by_name', key: 'updated_by_name', render: (text: string | null) => text || 'N/A' },
         {
             title: 'Hành động',
             key: 'actions',

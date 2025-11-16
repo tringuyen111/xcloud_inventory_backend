@@ -101,7 +101,6 @@ const WarehousesListPage: React.FC = () => {
                 p_sort_by: sorter?.field as string || 'created_at',
                 p_sort_order: sorter?.order === 'ascend' ? 'asc' : 'desc',
                 p_branch_id: advancedFilters.branch_id,
-                p_status: advancedFilters.status,
                 p_date_range: advancedFilters.date_range ? { 
                     start: dayjs(advancedFilters.date_range[0]).startOf('day').toISOString(), 
                     end: dayjs(advancedFilters.date_range[1]).endOf('day').toISOString()
@@ -217,12 +216,6 @@ const WarehousesListPage: React.FC = () => {
                         options={branches.map(b => ({ value: b.id, label: b.name }))}
                         allowClear
                     />
-                </Form.Item>
-                <Form.Item name="status" label="Trạng thái">
-                    <Select placeholder="Chọn trạng thái" allowClear>
-                        <Select.Option value={true}>Active</Select.Option>
-                        <Select.Option value={false}>Inactive</Select.Option>
-                    </Select>
                 </Form.Item>
                  <Form.Item name="date_range" label="Khoảng ngày tạo">
                     <RangePicker style={{ width: '100%' }} />

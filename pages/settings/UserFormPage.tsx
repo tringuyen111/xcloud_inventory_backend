@@ -104,64 +104,29 @@ const UserFormPage: React.FC = () => {
             const fetchUserDetails = async () => {
                 setLoading(true);
                 try {
-                    // This RPC should join users, user_roles, user_organizations, user_warehouses to get all details at once.
-                    // Assumes a 'get_user_details' RPC exists.
-                    const { data, error } = await supabase.rpc('get_user_details', { p_user_id: id });
-
-                    if (error) throw error;
-
-                    const userData = data[0] as any;
+                    const { data: userData, error: userError } = await supabase.from('users').select('*').eq('id', id).single();
+                    if(userError) throw userError;
                     
-                    form.setFieldsValue({
-                        full_name: userData.full_name,
-                        email: userData.email,
-                        phone: userData.phone,
-                        role_id: userData.role_id?.toString(),
-                        organization_id: userData.organization_id?.toString(),
-                        warehouse_id: userData.warehouse_id?.toString(),
-                        branch_id: userData.branch_id?.toString(),
-                    });
+                    const [roleRes, orgRes, whRes] = await Promise.all([
+                         supabase.from('user_roles').select('role_id, roles(name)').eq('user_id', id).single(),
+                         supabase.from('user_organizations').select('organization_id, organizations(name)').eq('user_id', id).single(),
+                         supabase.from('user_warehouses').select('warehouse_id, warehouses(name)').eq('user_id', id).single(),
+                    ]);
 
-                    if (userData.role_id && userData.role_name) {
-                        setRoleOptions([{ value: userData.role_id.toString(), label: userData.role_name }]);
-                    }
-                    if (userData.organization_id && userData.organization_name) {
-                        setOrgOptions([{ value: userData.organization_id.toString(), label: userData.organization_name }]);
-                    }
-                    if (userData.warehouse_id && userData.warehouse_name) {
-                        setWarehouseOptions([{ value: userData.warehouse_id.toString(), label: userData.warehouse_name }]);
-                    }
-                    
+                    const role_id = roleRes.data?.role_id;
+                    const organization_id = orgRes.data?.organization_id;
+                    const warehouse_id = whRes.data?.warehouse_id;
+
+                    form.setFieldsValue({ ...userData, role_id: role_id?.toString(), organization_id: organization_id?.toString(), warehouse_id: warehouse_id?.toString() });
+
+                     if (role_id && roleRes.data?.roles) setRoleOptions([{ value: role_id.toString(), label: roleRes.data.roles.name }]);
+                     if (organization_id && orgRes.data?.organizations) setOrgOptions([{ value: organization_id.toString(), label: orgRes.data.organizations.name }]);
+                     if (warehouse_id && whRes.data?.warehouses) setWarehouseOptions([{ value: warehouse_id.toString(), label: whRes.data.warehouses.name }]);
+
                     setPageTitle(`Chỉnh sửa: ${userData.full_name}`);
-                } catch (err: any) {
-                    // Fallback if get_user_details doesn't exist
-                    console.warn("RPC 'get_user_details' not found, using fallback queries.");
-                    try {
-                        const { data: userData, error: userError } = await supabase.from('users').select('*').eq('id', id).single();
-                        if(userError) throw userError;
-                        
-                        // Fetch linked items
-                        const [roleRes, orgRes, whRes] = await Promise.all([
-                             supabase.from('user_roles').select('role_id, roles(name)').eq('user_id', id).single(),
-                             supabase.from('user_organizations').select('organization_id, organizations(name)').eq('user_id', id).single(),
-                             supabase.from('user_warehouses').select('warehouse_id, warehouses(name)').eq('user_id', id).single(),
-                        ]);
-
-                        const role_id = roleRes.data?.role_id;
-                        const organization_id = orgRes.data?.organization_id;
-                        const warehouse_id = whRes.data?.warehouse_id;
-
-                        form.setFieldsValue({ ...userData, role_id: role_id?.toString(), organization_id: organization_id?.toString(), warehouse_id: warehouse_id?.toString() });
-
-                         if (role_id && roleRes.data?.roles) setRoleOptions([{ value: role_id.toString(), label: roleRes.data.roles.name }]);
-                         if (organization_id && orgRes.data?.organizations) setOrgOptions([{ value: organization_id.toString(), label: orgRes.data.organizations.name }]);
-                         if (warehouse_id && whRes.data?.warehouses) setWarehouseOptions([{ value: warehouse_id.toString(), label: whRes.data.warehouses.name }]);
-
-                        setPageTitle(`Chỉnh sửa: ${userData.full_name}`);
-                    } catch (fallbackError: any) {
-                        notification.error({ message: 'Lỗi tải thông tin người dùng', description: fallbackError.message });
-                        navigate('/settings/users');
-                    }
+                } catch (fallbackError: any) {
+                    notification.error({ message: 'Lỗi tải thông tin người dùng', description: fallbackError.message });
+                    navigate('/settings/users');
                 } finally {
                     setLoading(false);
                 }
@@ -176,11 +141,11 @@ const UserFormPage: React.FC = () => {
         
         try {
             if (isEditMode) {
-                // Call update RPC
+                // Call update RPC for existing users
                 const { error } = await supabase.rpc('update_user_with_permissions', {
                     p_user_id: id,
                     p_full_name: values.full_name,
-                    p_phone: values.phone,
+                    p_phone: values.phone || null,
                     p_role_id: values.role_id ? parseInt(values.role_id, 10) : null,
                     p_organization_id: values.organization_id ? parseInt(values.organization_id, 10) : null,
                     p_warehouse_id: values.warehouse_id ? parseInt(values.warehouse_id, 10) : null,
@@ -188,29 +153,51 @@ const UserFormPage: React.FC = () => {
                 });
                 if (error) throw error;
             } else {
-                // Call create RPC which handles auth user creation and profile sync internally
-                const { error } = await supabase.rpc('create_new_user_with_permissions', {
-                    p_email: values.email,
-                    p_password: values.password,
+                // Step 1: Call Edge Function to securely create the auth user
+                notification.info({ message: 'Step 1/2: Creating authentication user...' });
+
+                const { data: authData, error: authError } = await supabase.functions.invoke('create-auth-user', {
+                    body: { email: values.email, password: values.password },
+                });
+
+                if (authError) throw authError;
+                if (authData.error) throw new Error(authData.error);
+                
+                const newUserId = authData.user_id;
+                if (!newUserId) {
+                    throw new Error('Không thể tạo user auth. Email có thể đã tồn tại.');
+                }
+                
+                // Step 2: Call RPC to sync profile and assign permissions
+                notification.info({ message: 'Step 2/2: Syncing profile and permissions...' });
+
+                const { error: rpcError } = await supabase.rpc('sync_and_assign_user_permissions', {
+                    p_new_user_id: newUserId,
                     p_full_name: values.full_name,
-                    p_phone: values.phone,
+                    p_email: values.email,
+                    p_phone: values.phone || null,
                     p_role_id: parseInt(values.role_id, 10),
                     p_organization_id: values.organization_id ? parseInt(values.organization_id, 10) : null,
                     p_warehouse_id: values.warehouse_id ? parseInt(values.warehouse_id, 10) : null,
                     p_branch_id: values.branch_id ? parseInt(values.branch_id, 10) : null,
                     p_created_by: currentUser?.id,
                 });
-                if (error) throw error;
+
+                if (rpcError) {
+                    // Optional: Consider adding rollback logic here (e.g., delete the auth user)
+                    throw new Error(`Lỗi đồng bộ: ${rpcError.message}`);
+                }
             }
             
             notification.success({ message: `Người dùng đã được ${isEditMode ? 'cập nhật' : 'tạo'} thành công` });
             navigate('/settings/users');
 
         } catch (error: any) {
-             if (error.message.includes('User already registered') || (error.code === '23505' && error.message.includes('users_email_key'))) {
+             const errorMessage = error.message || (error.details ? JSON.stringify(error.details) : 'An unknown error occurred.');
+             if (errorMessage.includes('User already registered') || errorMessage.includes('duplicate key value violates unique constraint "users_email_key"') || errorMessage.includes('Email có thể đã tồn tại')) {
                 form.setFields([{ name: 'email', errors: ['Email này đã tồn tại.'] }]);
             } else {
-               notification.error({ message: `Lỗi ${isEditMode ? 'cập nhật' : 'tạo'} người dùng`, description: error.message });
+               notification.error({ message: `Lỗi ${isEditMode ? 'cập nhật' : 'tạo'} người dùng`, description: errorMessage });
            }
         } finally {
             setSubmitting(false);
