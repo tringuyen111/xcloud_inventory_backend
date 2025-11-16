@@ -1,164 +1,202 @@
 import React, { useEffect, useState } from 'react';
-import { App, Button, Card, Form, Input, Spin, Switch, Space, Row, Col, Affix } from 'antd';
-import { SaveOutlined, CloseOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import { organizationAPI } from '../../../utils/apiClient';
-import { Database } from '../../../types/supabase';
+import {
+    App,
+    Button,
+    Card,
+    Col,
+    Form,
+    Input,
+    Row,
+    Spin,
+    Switch,
+    Typography,
+} from 'antd';
+import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons';
+import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../hooks/useAuth';
 
-type OrganizationInsert = Database['master']['Tables']['organizations']['Insert'];
-type OrganizationUpdate = Database['master']['Tables']['organizations']['Update'];
+const { Title } = Typography;
 
 const OrganizationFormPage: React.FC = () => {
-    const [form] = Form.useForm();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const [form] = Form.useForm();
     const { notification } = App.useApp();
+    const { user } = useAuth();
 
-    const [loading, setLoading] = useState(false);
-    const [isEdit, setIsEdit] = useState(false);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [submitting, setSubmitting] = useState<boolean>(false);
+    const [organizationCode, setOrganizationCode] = useState<string>('');
+    
+    const isEditMode = !!id;
 
     useEffect(() => {
-        const isEditing = !!id;
-        setIsEdit(isEditing);
-        
-        if (isEditing) {
-            setLoading(true);
+        if (isEditMode) {
             const fetchOrganization = async () => {
-                try {
-                    const data = await organizationAPI.get(id);
-                    if (data) {
-                        form.setFieldsValue(data);
-                    }
-                } catch(error: any) {
-                    notification.error({ message: 'Error fetching organization', description: error.message });
-                } finally {
-                    setLoading(false);
+                setLoading(true);
+                const { data, error } = await supabase
+                    .from('organizations')
+                    .select('*')
+                    .eq('id', id)
+                    .single();
+                
+                if (error) {
+                    notification.error({
+                        message: 'Error Fetching Organization',
+                        description: error.message,
+                    });
+                    navigate('/master-data/organizations');
+                } else if (data) {
+                    form.setFieldsValue({
+                        ...data,
+                        status: data.is_active,
+                    });
+                    setOrganizationCode(data.code);
                 }
+                setLoading(false);
             };
             fetchOrganization();
-        } else {
-            form.resetFields();
-            form.setFieldsValue({ is_active: true });
         }
-    }, [id, form, notification]);
+    }, [id, isEditMode, navigate, form, notification]);
 
     const onFinish = async (values: any) => {
-        setLoading(true);
+        setSubmitting(true);
+        const { status, ...restValues } = values;
+        const payload = {
+            ...restValues,
+            is_active: status,
+            ...(isEditMode 
+                ? { updated_by: user?.id, updated_at: new Date().toISOString() } 
+                : { created_by: user?.id })
+        };
+        
         try {
-            if (isEdit) {
-                await organizationAPI.update(id!, values as OrganizationUpdate);
-                notification.success({ message: 'Success', description: 'Organization updated successfully.' });
+            if (isEditMode) {
+                const { error } = await supabase
+                    .from('organizations')
+                    .update(payload)
+                    .eq('id', id);
+                if (error) throw error;
             } else {
-                await organizationAPI.create(values as OrganizationInsert);
-                notification.success({ message: 'Success', description: 'Organization created successfully.' });
+                const { error } = await supabase
+                    .from('organizations')
+                    .insert(payload);
+                if (error) throw error;
             }
+            
+            notification.success({
+                message: `Organization successfully ${isEditMode ? 'updated' : 'created'}`,
+            });
             navigate('/master-data/organizations');
-        } catch (caughtError: any) {
-             notification.error({ message: 'Operation Failed', description: caughtError.message });
+
+        } catch (error: any) {
+            notification.error({
+                message: `Failed to ${isEditMode ? 'update' : 'create'} organization`,
+                description: error.message,
+            });
         } finally {
-            setLoading(false);
+            setSubmitting(false);
         }
     };
 
+    const pageTitle = isEditMode ? `Edit Organization: ${organizationCode}` : 'Create New Organization';
+
+    const headerActions = (
+        <div className="flex items-center space-x-2">
+            <Button
+                icon={<ArrowLeftOutlined />}
+                onClick={() => navigate('/master-data/organizations')}
+            >
+                Back to List
+            </Button>
+            <Button
+                type="primary"
+                icon={<SaveOutlined />}
+                htmlType="submit"
+                loading={submitting}
+            >
+                Save
+            </Button>
+        </div>
+    );
+
     return (
         <Spin spinning={loading}>
-            <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ is_active: true }}>
-                <Card title={isEdit ? 'Edit Organization' : 'Create Organization'}>
-                    {isEdit && (
-                        <Row gutter={16}>
-                            <Col xs={24} sm={12}>
-                                <Form.Item name="code" label="Organization Code">
-                                    <Input disabled style={{ cursor: 'not-allowed', backgroundColor: '#f5f5f5' }} />
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                    )}
-
-                    <Row gutter={16}>
-                        <Col xs={24} sm={12}>
-                            <Form.Item name="name" label="Organization Name (Vietnamese)" rules={[{ required: true, message: 'Please enter the organization name' }]}>
-                                <Input placeholder="e.g., Công ty Cổ phần ABC" />
+            <Form
+                form={form}
+                layout="vertical"
+                onFinish={onFinish}
+                initialValues={{ status: true }}
+            >
+                <Card
+                    title={<Title level={4} style={{ margin: 0 }}>{pageTitle}</Title>}
+                    extra={headerActions}
+                >
+                    <Row gutter={24}>
+                        <Col xs={24} md={12}>
+                            <Form.Item
+                                name="code"
+                                label="Organization Code"
+                                rules={[{ required: true, message: 'Code is required' }]}
+                            >
+                                <Input placeholder="e.g., ORG-001" disabled={isEditMode} />
                             </Form.Item>
                         </Col>
-                        <Col xs={24} sm={12}>
-                            <Form.Item name="name_en" label="Organization Name (English)">
-                                <Input placeholder="e.g., ABC Corporation" />
+                        <Col xs={24} md={12}>
+                             <Form.Item
+                                name="name"
+                                label="Organization Name"
+                                rules={[{ required: true, message: 'Name is required' }]}
+                            >
+                                <Input placeholder="e.g., Main Distribution Inc." />
                             </Form.Item>
                         </Col>
-                    </Row>
-                    
-                     <Row gutter={16}>
-                        <Col xs={24} sm={12}>
-                            <Form.Item name="tax_code" label="Tax Code">
-                                <Input placeholder="e.g., 0101234567" />
+                        <Col xs={24} md={12}>
+                            <Form.Item
+                                name="email"
+                                label="Email"
+                                rules={[{ type: 'email', message: 'Please enter a valid email' }]}
+                            >
+                                <Input placeholder="e.g., contact@organization.com" />
                             </Form.Item>
                         </Col>
-                         <Col xs={24} sm={12}>
-                            <Form.Item name="phone" label="Phone Number">
-                                <Input placeholder="e.g., (+84) 28 3848 1234" />
+                        <Col xs={24} md={12}>
+                            <Form.Item name="phone" label="Phone">
+                                <Input placeholder="e.g., (123) 456-7890" />
                             </Form.Item>
                         </Col>
-                    </Row>
-
-                     <Row gutter={16}>
-                         <Col xs={24} sm={12}>
-                            <Form.Item name="email" label="Email Address" rules={[{ type: 'email' }]}>
-                                <Input placeholder="e.g., contact@abccorp.vn" />
+                        <Col xs={24} md={12}>
+                             <Form.Item name="tax_code" label="Tax Code">
+                                <Input placeholder="e.g., 1234567890" />
                             </Form.Item>
                         </Col>
-                         <Col xs={24} sm={12}>
-                            <Form.Item name="website" label="Website" rules={[{ type: 'url' }]}>
-                                <Input placeholder="e.g., https://www.abccorp.vn" />
+                         <Col xs={24} md={12}>
+                            <Form.Item name="status" label="Status" valuePropName="checked">
+                                <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
                             </Form.Item>
                         </Col>
-                    </Row>
-
-                    <Row gutter={16}>
                         <Col span={24}>
-                             <Form.Item name="address" label="Address">
-                                <Input.TextArea rows={3} placeholder="Full address" />
+                            <Form.Item name="address" label="Address">
+                                <Input.TextArea rows={2} placeholder="Enter full address" />
                             </Form.Item>
                         </Col>
-                    </Row>
-
-                     <Row gutter={16}>
-                        <Col span={24}>
-                             <Form.Item name="description" label="Description / Notes">
+                         <Col span={24}>
+                            <Form.Item name="notes" label="Notes">
                                 <Input.TextArea rows={3} placeholder="Any additional notes" />
                             </Form.Item>
                         </Col>
                     </Row>
-                    
-                    {isEdit && (
-                        <Form.Item name="is_active" label="Status" valuePropName="checked">
-                            <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
-                        </Form.Item>
-                    )}
                 </Card>
-                
-                <Affix offsetBottom={0}>
-                    <Card className="mt-4 p-0 border-t">
-                        <Row justify="end">
-                            <Col>
-                                <Space>
-                                    <Button icon={<CloseOutlined />} onClick={() => navigate('/master-data/organizations')}>
-                                        Cancel
-                                    </Button>
-                                    <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading}>
-                                        {isEdit ? 'Save Changes' : 'Create Organization'}
-                                    </Button>
-                                </Space>
-                            </Col>
-                        </Row>
-                    </Card>
-                </Affix>
             </Form>
         </Spin>
     );
 };
 
 const OrganizationFormPageWrapper: React.FC = () => (
-    <App><OrganizationFormPage /></App>
+    <App>
+        <OrganizationFormPage />
+    </App>
 );
 
 export default OrganizationFormPageWrapper;

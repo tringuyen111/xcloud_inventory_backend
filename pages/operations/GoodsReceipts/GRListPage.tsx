@@ -1,243 +1,350 @@
 
-
-import React, { useEffect, useState, useMemo } from 'react';
-import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, DatePicker, Dropdown, Menu, Checkbox } from 'antd';
-import { EyeOutlined, PlusOutlined, FileExcelOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import {
+    App,
+    Button,
+    Card,
+    Input,
+    Table,
+    Space,
+    Typography,
+    Pagination,
+    Tooltip,
+    Popover,
+    Checkbox,
+    Form,
+    Select,
+    DatePicker,
+    Tag,
+} from 'antd';
+import {
+    PlusOutlined,
+    SearchOutlined,
+    EditOutlined,
+    EyeOutlined,
+    FilterOutlined,
+    SettingOutlined,
+} from '@ant-design/icons';
+import { supabase } from '../../../lib/supabase';
 import { useDebounce } from '../../../hooks/useDebounce';
+import Can from '../../../components/auth/Can';
 import dayjs from 'dayjs';
-import isBetween from 'dayjs/plugin/isBetween';
-import { goodsReceiptAPI, warehouseAPI, partnerAPI } from '../../../utils/apiClient';
+import { TablePaginationConfig } from 'antd/lib/table';
+import { SorterResult } from 'antd/lib/table/interface';
 import { Database } from '../../../types/supabase';
 
-dayjs.extend(isBetween);
 const { RangePicker } = DatePicker;
 
-type GoodsReceipt = Database['transactions']['Tables']['gr_header']['Row'];
-type Warehouse = Database['master']['Tables']['warehouses']['Row'];
-type Partner = Database['master']['Tables']['partners']['Row'];
-
-const GR_STATUSES: GoodsReceipt['status'][] = ['DRAFT', 'CREATED', 'RECEIVING', 'RECEIVED', 'COMPLETED', 'CANCELLED'];
-const GR_TYPES: GoodsReceipt['gr_type'][] = ['PURCHASE', 'TRANSFER_IN', 'ADJUSTMENT_IN', 'RETURN_IN', 'OTHER'];
-
-const getStatusColor = (status: GoodsReceipt['status']) => {
-  switch (status) {
-    case 'DRAFT': return 'default';
-    case 'CREATED': return 'processing';
-    case 'RECEIVING': return 'blue';
-    case 'RECEIVED': return 'purple';
-    case 'COMPLETED': return 'success';
-    case 'CANCELLED': return 'error';
-    default: return 'default';
-  }
+// --- Types ---
+type GoodsReceiptViewData = {
+  id: number;
+  code: string;
+  status: Database['public']['Enums']['doc_status_enum'];
+  type: Database['public']['Enums']['gr_type_enum'];
+  warehouse_name: string;
+  partner_name: string | null;
+  expected_date: string;
+  received_date: string | null;
+  created_at: string;
+  created_by_name: string | null;
+  updated_at: string;
+  updated_by_name: string | null;
 };
 
-const GRListPage: React.FC = () => {
-  const [allGrList, setAllGrList] = useState<GoodsReceipt[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [warehouses, setWarehouses] = useState<Pick<Warehouse, 'id' | 'name'>[]>([]);
-  const [suppliers, setSuppliers] = useState<Pick<Partner, 'id' | 'name'>[]>([]);
-  
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [typeFilter, setTypeFilter] = useState<string[]>([]);
-  const [warehouseFilter, setWarehouseFilter] = useState<string[]>([]);
-  const [supplierFilter, setSupplierFilter] = useState<string[]>([]);
-  const [dateFilter, setDateFilter] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
+type FilterData = {
+    id: number;
+    name: string;
+};
 
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const navigate = useNavigate();
-  const { notification } = App.useApp();
-  
-  const warehousesMap = useMemo(() => new Map(warehouses.map(w => [w.id, w.name])), [warehouses]);
-  const suppliersMap = useMemo(() => new Map(suppliers.map(s => [s.id, s.name])), [suppliers]);
+const DOC_STATUSES: Database['public']['Enums']['doc_status_enum'][] = ['DRAFT', 'CREATED', 'IN_PROGRESS', 'WAITING_APPROVAL', 'APPROVED', 'COMPLETED', 'CANCELLED'];
+const GR_TYPES: Database['public']['Enums']['gr_type_enum'][] = ['PURCHASE', 'RETURN', 'ADJUSTMENT', 'PRODUCTION'];
 
-  const columns = useMemo(() => [
-    { title: 'GR Code', dataIndex: 'code', key: 'code', sorter: (a: GoodsReceipt, b: GoodsReceipt) => a.code.localeCompare(b.code) },
-    { 
-      title: 'Document Date', 
-      dataIndex: 'document_date', 
-      key: 'document_date',
-      render: (date: string) => date ? dayjs(date).format('YYYY-MM-DD') : 'N/A',
-      sorter: (a: GoodsReceipt, b: GoodsReceipt) => dayjs(a.document_date).unix() - dayjs(b.document_date).unix(),
-    },
-    { title: 'Warehouse', dataIndex: 'warehouse_id', key: 'warehouse_id', render: (id: string) => warehousesMap.get(id) || 'N/A' },
-    { title: 'Supplier', dataIndex: 'supplier_id', key: 'supplier_id', render: (id: string | null) => id ? suppliersMap.get(id) || 'N/A' : 'N/A' },
-    { title: 'Type', dataIndex: 'gr_type', key: 'gr_type', render: (type: string) => <Tag>{type}</Tag> },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: GoodsReceipt['status']) => <Tag color={getStatusColor(status)}>{status}</Tag>,
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_: any, record: GoodsReceipt) => (
-        <Space size="middle">
-          <Tooltip title="View Details">
-            <Button icon={<EyeOutlined />} onClick={() => navigate(`/operations/gr/${record.id}`)} />
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ], [navigate, warehousesMap, suppliersMap]);
-
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => columns.map(c => c.key as string));
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [grData, whData, partnerData] = await Promise.all([
-            goodsReceiptAPI.list(),
-            warehouseAPI.list(),
-            partnerAPI.list()
-        ]);
-
-        setAllGrList(grData || []);
-        setWarehouses(whData || []);
-        setSuppliers(partnerData.filter(p => p.is_supplier) || []);
-      } catch (error: any) {
-        notification.error({ message: 'Error fetching data', description: error.message });
-      } finally {
-        setLoading(false);
-      }
+// --- Shared Components ---
+const statusTag = (status: Database['public']['Enums']['doc_status_enum']) => {
+    const colorMap: Record<Database['public']['Enums']['doc_status_enum'], string> = {
+        DRAFT: 'default',
+        CREATED: 'cyan',
+        IN_PROGRESS: 'processing',
+        WAITING_APPROVAL: 'warning',
+        APPROVED: 'purple',
+        COMPLETED: 'success',
+        CANCELLED: 'error',
     };
-    fetchData();
-  }, [notification]);
+    return <Tag color={colorMap[status] || 'default'}>{status}</Tag>;
+};
 
-  const filteredGrList = useMemo(() => {
-    let filtered = [...allGrList];
-    if (debouncedSearchTerm) {
-      filtered = filtered.filter(item =>
-        item.code.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
-      );
-    }
-    if (statusFilter.length > 0) {
-        filtered = filtered.filter(item => statusFilter.includes(item.status));
-    }
-    if (typeFilter.length > 0) {
-        filtered = filtered.filter(item => typeFilter.includes(item.gr_type));
-    }
-    if (warehouseFilter.length > 0) {
-        filtered = filtered.filter(item => warehouseFilter.includes(item.warehouse_id));
-    }
-    if (supplierFilter.length > 0) {
-        filtered = filtered.filter(item => item.supplier_id && supplierFilter.includes(item.supplier_id));
-    }
-    if (dateFilter && dateFilter[0] && dateFilter[1]) {
-        const [start, end] = dateFilter;
-        filtered = filtered.filter(item => {
-            const docDate = dayjs(item.document_date);
-            return docDate.isBetween(start, end, 'day', '[]');
-        });
-    }
-    return filtered;
-  }, [debouncedSearchTerm, statusFilter, typeFilter, warehouseFilter, supplierFilter, dateFilter, allGrList]);
-  
-  const columnSelector = (
-    <Dropdown
-      overlay={
-        <Menu>
-          <Checkbox.Group
-            className="flex flex-col p-2"
-            options={columns.map(({ key, title }) => ({ label: title as string, value: key as string }))}
-            value={visibleColumns}
-            onChange={(values) => setVisibleColumns(values as string[])}
-          />
-        </Menu>
-      }
-      trigger={['click']}
-    >
-      <Button icon={<EyeOutlined />}>Columns</Button>
-    </Dropdown>
-);
+const typeTag = (type: Database['public']['Enums']['gr_type_enum']) => {
+    const colorMap: Record<Database['public']['Enums']['gr_type_enum'], string> = {
+        PURCHASE: 'blue',
+        RETURN: 'volcano',
+        ADJUSTMENT: 'magenta',
+        PRODUCTION: 'geekblue',
+    };
+    return <Tag color={colorMap[type] || 'default'}>{type}</Tag>;
+};
 
-  return (
-    <Card
-      title="Goods Receipts"
-      extra={
-        <Space>
-          {columnSelector}
-          <Button icon={<FileExcelOutlined />}>Export</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/gr/create')}>
-            Create
-          </Button>
-        </Space>
-      }
-    >
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={6}>
-            <Input.Search 
-              placeholder="Search by GR code..." 
-              onSearch={setSearchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              allowClear
+// --- Main Page Component ---
+const GRListPage: React.FC = () => {
+    const navigate = useNavigate();
+    const { notification } = App.useApp();
+    const [form] = Form.useForm();
+
+    const [goodsReceipts, setGoodsReceipts] = useState<GoodsReceiptViewData[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [totalCount, setTotalCount] = useState(0);
+    const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
+    const [sorter, setSorter] = useState<SorterResult<GoodsReceiptViewData> | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
+    const [advancedFilters, setAdvancedFilters] = useState<any>({});
+    const [filterPopoverVisible, setFilterPopoverVisible] = useState(false);
+    const [columnPopoverVisible, setColumnPopoverVisible] = useState(false);
+    
+    const [warehouses, setWarehouses] = useState<FilterData[]>([]);
+    const [partners, setPartners] = useState<FilterData[]>([]);
+
+    const defaultColumns = ['code', 'status', 'type', 'warehouse_name', 'partner_name', 'expected_date', 'created_at', 'actions'];
+    const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns);
+
+    // Fetch data for filters
+    useEffect(() => {
+        const fetchFilterData = async () => {
+            const [whData, partnerData] = await Promise.all([
+                supabase.from('warehouses').select('id, name').order('name'),
+                supabase.from('partners').select('id, name').order('name')
+            ]);
+            if (whData.error) notification.error({ message: 'Lỗi tải danh sách kho', description: whData.error.message });
+            else setWarehouses(whData.data);
+            if (partnerData.error) notification.error({ message: 'Lỗi tải danh sách đối tác', description: partnerData.error.message });
+            else setPartners(partnerData.data);
+        };
+        fetchFilterData();
+    }, [notification]);
+
+    const fetchGoodsReceipts = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { current, pageSize } = pagination;
+            const params = {
+                p_page_number: current,
+                p_page_size: pageSize,
+                p_search_text: debouncedSearchTerm || null,
+                p_sort_by: sorter?.field as string || 'created_at',
+                p_sort_order: sorter?.order === 'ascend' ? 'asc' : 'desc',
+                p_warehouse_id: advancedFilters.warehouse_id,
+                p_partner_id: advancedFilters.partner_id,
+                p_gr_type: advancedFilters.gr_type,
+                p_status: advancedFilters.status,
+                p_date_range: advancedFilters.expected_date_range ? { 
+                    start: dayjs(advancedFilters.expected_date_range[0]).startOf('day').toISOString(), 
+                    end: dayjs(advancedFilters.expected_date_range[1]).endOf('day').toISOString()
+                } : null,
+            };
+
+            const { data, error } = await supabase.rpc('get_goods_receipts_list', params);
+
+            if (error) throw error;
+            
+            const result = data as { data: GoodsReceiptViewData[], total_count: number };
+            setGoodsReceipts(result.data || []);
+            setTotalCount(result.total_count || 0);
+
+        } catch (error: any) {
+            notification.error({
+                message: 'Lỗi tải danh sách phiếu nhập',
+                description: `RPC Error: ${error.message}.`,
+            });
+        } finally {
+            setLoading(false);
+        }
+    }, [pagination, sorter, debouncedSearchTerm, advancedFilters, notification]);
+
+    useEffect(() => {
+        fetchGoodsReceipts();
+    }, [fetchGoodsReceipts]);
+
+    const handleTableChange = (
+        newPagination: TablePaginationConfig, 
+        filters: any, 
+        newSorter: SorterResult<GoodsReceiptViewData> | SorterResult<GoodsReceiptViewData>[]
+    ) => {
+        setPagination(prev => ({ ...prev, current: newPagination.current || 1 }));
+        const currentSorter = Array.isArray(newSorter) ? newSorter[0] : newSorter;
+        setSorter(currentSorter.field && currentSorter.order ? currentSorter : null);
+    };
+
+    const handleFilterFinish = (values: any) => {
+        setAdvancedFilters(values);
+        setFilterPopoverVisible(false);
+    };
+
+    const handleFilterReset = () => {
+        form.resetFields();
+        setAdvancedFilters({});
+        setFilterPopoverVisible(false);
+    };
+
+    const allColumns = useMemo(() => [
+        { 
+            title: 'Mã Phiếu nhập',
+            dataIndex: 'code',
+            key: 'code',
+            sorter: true,
+            render: (text: string, record: GoodsReceiptViewData) => <Link to={`/operations/gr/${record.id}`}>{text}</Link>
+        },
+        { title: 'Trạng thái', dataIndex: 'status', key: 'status', sorter: true, render: statusTag },
+        { title: 'Loại Phiếu nhập', dataIndex: 'type', key: 'type', sorter: true, render: typeTag },
+        { title: 'Kho', dataIndex: 'warehouse_name', key: 'warehouse_name', sorter: true },
+        { title: 'Đối tác', dataIndex: 'partner_name', key: 'partner_name', sorter: true, render: (text: string) => text || 'N/A' },
+        { title: 'Ngày dự kiến', dataIndex: 'expected_date', key: 'expected_date', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
+        { title: 'Ngày nhận', dataIndex: 'received_date', key: 'received_date', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
+        { title: 'Ngày tạo', dataIndex: 'created_at', key: 'created_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
+        { title: 'Người tạo', dataIndex: 'created_by_name', key: 'created_by_name' },
+        { title: 'Ngày cập nhật', dataIndex: 'updated_at', key: 'updated_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY HH:mm') : '-' },
+        { title: 'Người cập nhật', dataIndex: 'updated_by_name', key: 'updated_by_name' },
+        {
+            title: 'Hành động',
+            key: 'actions',
+            align: 'center' as const,
+            fixed: 'right' as const,
+            width: 100,
+            render: (_: any, record: GoodsReceiptViewData) => (
+                <Space size="small">
+                    <Tooltip title="Xem chi tiết">
+                        <button className="table-action-button" onClick={() => navigate(`/operations/gr/${record.id}`)}>
+                            <EyeOutlined />
+                        </button>
+                    </Tooltip>
+                    {record.status === 'DRAFT' && (
+                        <Can module="operations" action="execute">
+                            <Tooltip title="Chỉnh sửa">
+                                <button className="table-action-button" onClick={() => navigate(`/operations/gr/${record.id}/edit`)}>
+                                    <EditOutlined />
+                                </button>
+                            </Tooltip>
+                        </Can>
+                    )}
+                </Space>
+            ),
+        },
+    ], [navigate]);
+
+    const columnToggler = (
+        <div style={{ padding: 8, width: 200 }}>
+            <Typography.Title level={5}>Tùy chỉnh cột</Typography.Title>
+            <Checkbox.Group
+                className="flex flex-col space-y-2"
+                options={allColumns.filter(c => c.key !== 'actions').map(c => ({ label: c.title, value: c.key as string }))}
+                value={visibleColumns}
+                onChange={(checkedValues) => setVisibleColumns([...checkedValues, 'actions'])}
             />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-              <Select
-                  mode="multiple"
-                  allowClear
-                  style={{ width: '100%' }}
-                  placeholder="Filter by type..."
-                  onChange={setTypeFilter}
-                  options={GR_TYPES.map(type => ({ label: type, value: type }))}
-              />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-              <Select
-                  mode="multiple"
-                  allowClear
-                  style={{ width: '100%' }}
-                  placeholder="Filter by status..."
-                  onChange={setStatusFilter}
-                  options={GR_STATUSES.map(status => ({ label: status, value: status }))}
-              />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <RangePicker style={{ width: '100%' }} onChange={(dates) => setDateFilter(dates as any)} />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-              <Select
-                  mode="multiple"
-                  allowClear
-                  style={{ width: '100%' }}
-                  placeholder="Filter by warehouse..."
-                  onChange={setWarehouseFilter}
-                  options={warehouses.map(w => ({ label: w.name, value: w.id }))}
-              />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-              <Select
-                  mode="multiple"
-                  allowClear
-                  style={{ width: '100%' }}
-                  placeholder="Filter by supplier..."
-                  onChange={setSupplierFilter}
-                  options={suppliers.map(s => ({ label: s.name, value: s.id }))}
-              />
-          </Col>
-        </Row>
-        <Spin spinning={loading}>
-          <Table 
-              dataSource={filteredGrList} 
-              columns={columns.filter(c => visibleColumns.includes(c.key as string))} 
-              rowKey="id" 
-              size="small" 
-              bordered 
-              pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '20', '50'] }}
-          />
-        </Spin>
-      </Space>
-    </Card>
-  );
+        </div>
+    );
+    
+    const advancedFilterForm = (
+        <div style={{ padding: 16, width: 350 }}>
+            <Typography.Title level={5}>Bộ lọc nâng cao</Typography.Title>
+            <Form form={form} layout="vertical" onFinish={handleFilterFinish}>
+                <Form.Item name="warehouse_id" label="Kho">
+                    <Select
+                        showSearch placeholder="Chọn kho" optionFilterProp="children"
+                        filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                        options={warehouses.map(wh => ({ value: wh.id, label: wh.name }))} allowClear
+                    />
+                </Form.Item>
+                 <Form.Item name="partner_id" label="Đối tác">
+                    <Select
+                        showSearch placeholder="Chọn đối tác" optionFilterProp="children"
+                        filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                        options={partners.map(p => ({ value: p.id, label: p.name }))} allowClear
+                    />
+                </Form.Item>
+                <Form.Item name="status" label="Trạng thái">
+                    <Select placeholder="Chọn trạng thái" mode="multiple" allowClear>
+                        {DOC_STATUSES.map(status => <Select.Option key={status} value={status}>{status}</Select.Option>)}
+                    </Select>
+                </Form.Item>
+                <Form.Item name="gr_type" label="Loại phiếu nhập">
+                    <Select placeholder="Chọn loại phiếu nhập" mode="multiple" allowClear>
+                        {GR_TYPES.map(type => <Select.Option key={type} value={type}>{type}</Select.Option>)}
+                    </Select>
+                </Form.Item>
+                <Form.Item name="expected_date_range" label="Khoảng ngày dự kiến">
+                    <RangePicker style={{ width: '100%' }} />
+                </Form.Item>
+                <Space>
+                    <Button onClick={handleFilterReset}>Đặt lại</Button>
+                    <Button type="primary" htmlType="submit">Xác nhận</Button>
+                </Space>
+            </Form>
+        </div>
+    );
+
+    return (
+        <Card>
+            <div className="flex justify-between items-center mb-6">
+                <Typography.Title level={4} style={{ margin: 0 }}>Danh sách Phiếu nhập</Typography.Title>
+                <Can module="operations" action="create">
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/gr/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
+                        Thêm mới Phiếu nhập
+                    </Button>
+                </Can>
+            </div>
+            <div className="flex justify-between items-center mb-4">
+                <Space>
+                    <Popover content={columnToggler} trigger="click" placement="bottomLeft" visible={columnPopoverVisible} onVisibleChange={setColumnPopoverVisible}>
+                        <Button icon={<SettingOutlined />} aria-label="Tùy chỉnh cột" />
+                    </Popover>
+                    <Popover content={advancedFilterForm} trigger="click" placement="bottomLeft" visible={filterPopoverVisible} onVisibleChange={setFilterPopoverVisible}>
+                        <Button icon={<FilterOutlined />} aria-label="Bộ lọc nâng cao" />
+                    </Popover>
+                    <Input
+                        placeholder="Tìm kiếm theo Mã phiếu, Kho, Đối tác..."
+                        prefix={<SearchOutlined />}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        style={{ width: 300 }}
+                        allowClear
+                    />
+                </Space>
+            </div>
+
+            <div className="modern-table-container">
+                <Table
+                    rowKey="id"
+                    columns={allColumns.filter(c => visibleColumns.includes(c.key as string))}
+                    dataSource={goodsReceipts}
+                    loading={loading}
+                    pagination={false}
+                    onChange={handleTableChange}
+                    scroll={{ x: 'max-content' }}
+                    className="custom-scrollbar"
+                />
+                <div className="table-footer">
+                    <div>
+                        {totalCount > 0 && <Typography.Text>Tổng: {totalCount}</Typography.Text>}
+                    </div>
+                    <Pagination
+                        current={pagination.current}
+                        pageSize={pagination.pageSize}
+                        total={totalCount}
+                        showSizeChanger
+                        onChange={(page, pageSize) => setPagination({ current: page, pageSize })}
+                        onShowSizeChange={(_, size) => setPagination({ current: 1, pageSize: size })}
+                        pageSizeOptions={['10', '20', '50']}
+                    />
+                </div>
+            </div>
+        </Card>
+    );
 };
 
 const GRListPageWrapper: React.FC = () => (
-    <App><GRListPage /></App>
+    <App>
+        <GRListPage />
+    </App>
 );
 
 export default GRListPageWrapper;

@@ -1,208 +1,289 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, Dropdown, Menu, Checkbox } from 'antd';
-import { EyeOutlined, PlusOutlined, EditOutlined, FileExcelOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
-import { useDebounce } from '../../../hooks/useDebounce';
-import { branchAPI, organizationAPI } from '../../../utils/apiClient';
-import { Database } from '../../../types/supabase';
-import dayjs from 'dayjs';
-import type { TableProps } from 'antd';
-import Can from '../../../components/auth/Can';
 
-type Branch = Database['master']['Tables']['branches']['Row'];
-type Organization = Database['master']['Tables']['organizations']['Row'];
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import {
+    App,
+    Button,
+    Card,
+    Input,
+    Table,
+    Space,
+    Typography,
+    Pagination,
+    Tooltip,
+    Popover,
+    Checkbox,
+    Form,
+    Select,
+} from 'antd';
+import {
+    PlusOutlined,
+    SearchOutlined,
+    EditOutlined,
+    EyeOutlined,
+    FilterOutlined,
+    SettingOutlined,
+} from '@ant-design/icons';
+import { supabase } from '../../../lib/supabase';
+import { useDebounce } from '../../../hooks/useDebounce';
+import Can from '../../../components/auth/Can';
+import dayjs from 'dayjs';
+import StatusTag from '../../../components/shared/StatusTag';
+import { TablePaginationConfig } from 'antd/lib/table';
+import { SorterResult } from 'antd/lib/table/interface';
+
+// Type for the data returned by v_branches_list view / get_branches_list RPC
+type BranchViewData = {
+  id: number;
+  code: string;
+  name: string;
+  is_active: boolean;
+  organization_name: string;
+  address: string | null;
+  created_at: string;
+  created_by_name: string | null;
+};
+
+// Type for organization data for filter dropdown
+type OrganizationFilterData = {
+    id: number;
+    name: string;
+};
 
 const BranchesListPage: React.FC = () => {
-  const [allBranches, setAllBranches] = useState<Branch[]>([]);
-  const [filteredBranches, setFilteredBranches] = useState<Branch[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [organizations, setOrganizations] = useState<Pick<Organization, 'id' | 'name'>[]>([]);
-  
-  // Filter states
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<boolean | null>(null);
-  const [orgFilter, setOrgFilter] = useState<string[]>([]);
-  
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const navigate = useNavigate();
-  const { notification } = App.useApp();
-  
-  const organizationsMap = useMemo(() => new Map(organizations.map(o => [o.id, o.name])), [organizations]);
+    const navigate = useNavigate();
+    const { notification } = App.useApp();
+    const [form] = Form.useForm();
 
-  const initialColumns: TableProps<Branch>['columns'] = useMemo(() => [
-    { title: 'Branch Code', dataIndex: 'code', key: 'code', sorter: (a, b) => a.code.localeCompare(b.code) },
-    { title: 'Branch Name', dataIndex: 'name', key: 'name', sorter: (a, b) => a.name.localeCompare(b.name) },
-    { 
-      title: 'Organization', 
-      dataIndex: 'organization_id', 
-      key: 'organization_id', 
-      render: (id: string) => organizationsMap.get(id) || id,
-      sorter: (a, b) => (organizationsMap.get(a.organization_id) || '').localeCompare(organizationsMap.get(b.organization_id) || '')
-    },
-    { title: 'Phone', dataIndex: 'phone', key: 'phone' },
-    { title: 'Manager', dataIndex: 'manager_name', key: 'manager_name' },
-    {
-      title: 'Status',
-      dataIndex: 'is_active',
-      key: 'is_active',
-      render: (isActive: boolean) => <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'ACTIVE' : 'INACTIVE'}</Tag>,
-    },
-    {
-      title: 'Last Updated',
-      dataIndex: 'updated_at',
-      key: 'updated_at',
-      render: (date: string) => dayjs(date).format('YYYY-MM-DD HH:mm'),
-      sorter: (a, b) => dayjs(a.updated_at).unix() - dayjs(b.updated_at).unix(),
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      align: 'center',
-      render: (_: any, record: Branch) => (
-        <Space size="middle">
-          <Tooltip title="View Details"><Button type="text" icon={<EyeOutlined />} onClick={() => navigate(`/master-data/branches/${record.id}`)} /></Tooltip>
-          <Can module="masterData" action="edit">
-            <Tooltip title="Edit"><Button type="text" icon={<EditOutlined />} onClick={() => navigate(`/master-data/branches/${record.id}/edit`)} /></Tooltip>
-          </Can>
-        </Space>
-      ),
-    },
-  ], [navigate, organizationsMap]);
-  
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => initialColumns.map(c => c!.key as string));
+    const [branches, setBranches] = useState<BranchViewData[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [totalCount, setTotalCount] = useState(0);
+    const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
+    const [sorter, setSorter] = useState<SorterResult<BranchViewData> | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [branchData, orgData] = await Promise.all([
-            branchAPI.list(),
-            organizationAPI.list()
-        ]);
+    const [advancedFilters, setAdvancedFilters] = useState<any>({});
+    const [filterPopoverVisible, setFilterPopoverVisible] = useState(false);
+    const [columnPopoverVisible, setColumnPopoverVisible] = useState(false);
+    const [organizations, setOrganizations] = useState<OrganizationFilterData[]>([]);
 
-        setAllBranches(branchData || []);
-        setOrganizations(orgData || []);
-      } catch (error: any) {
-        notification.error({ message: 'Error fetching data', description: error.message });
-      } finally {
-        setLoading(false);
-      }
+    const defaultColumns = ['code', 'name', 'is_active', 'organization_name', 'created_at', 'created_by_name', 'actions'];
+    const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns);
+
+    // Fetch organizations for the filter dropdown
+    useEffect(() => {
+        const fetchOrganizations = async () => {
+            const { data, error } = await supabase.from('organizations').select('id, name').order('name');
+            if (error) {
+                notification.error({ message: 'Error fetching organizations', description: error.message });
+            } else {
+                setOrganizations(data);
+            }
+        };
+        fetchOrganizations();
+    }, [notification]);
+
+    const fetchBranches = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { current, pageSize } = pagination;
+            const params = {
+                p_page_number: current,
+                p_page_size: pageSize,
+                p_search_text: debouncedSearchTerm || null,
+                p_sort_by: sorter?.field as string || 'created_at',
+                p_sort_order: sorter?.order === 'ascend' ? 'asc' : 'desc',
+                p_organization_id: advancedFilters.organization_id,
+                p_status: advancedFilters.status,
+            };
+
+            const { data, error } = await supabase.rpc('get_branches_list', params);
+
+            if (error) throw error;
+            
+            // RPC is expected to return a single object with data and total_count properties
+            const result = data as { data: BranchViewData[], total_count: number };
+            setBranches(result.data || []);
+            setTotalCount(result.total_count || 0);
+
+        } catch (error: any) {
+            notification.error({
+                message: 'Error fetching branches',
+                description: `RPC Error: ${error.message}. Ensure the 'get_branches_list' function exists and accepts all required parameters, including advanced filters.`,
+            });
+        } finally {
+            setLoading(false);
+        }
+    }, [pagination, sorter, debouncedSearchTerm, advancedFilters, notification]);
+
+    useEffect(() => {
+        fetchBranches();
+    }, [fetchBranches]);
+
+    const handleTableChange = (
+        pagination: TablePaginationConfig, 
+        filters: any, 
+        sorter: SorterResult<BranchViewData> | SorterResult<BranchViewData>[]
+    ) => {
+        setPagination(prev => ({ ...prev, current: pagination.current || 1 }));
+        const currentSorter = Array.isArray(sorter) ? sorter[0] : sorter;
+        setSorter(currentSorter.field && currentSorter.order ? currentSorter : null);
     };
-    fetchData();
-  }, [notification]);
 
-  useEffect(() => {
-    let filtered = [...allBranches];
-    if (debouncedSearchTerm) {
-      const lowercasedFilter = debouncedSearchTerm.toLowerCase();
-      filtered = filtered.filter(item =>
-        item.code.toLowerCase().includes(lowercasedFilter) ||
-        item.name.toLowerCase().includes(lowercasedFilter) ||
-        (item.manager_name && item.manager_name.toLowerCase().includes(lowercasedFilter))
-      );
-    }
-    if (statusFilter !== null) {
-        filtered = filtered.filter(item => item.is_active === statusFilter);
-    }
-    if (orgFilter.length > 0) {
-        filtered = filtered.filter(item => orgFilter.includes(item.organization_id));
-    }
-    setFilteredBranches(filtered);
-  }, [debouncedSearchTerm, statusFilter, orgFilter, allBranches]);
+    const handleFilterFinish = (values: any) => {
+        setAdvancedFilters(values);
+        setFilterPopoverVisible(false);
+    };
 
-  const columnSelector = (
-    <Dropdown
-      overlay={
-        <Menu>
-          <Checkbox.Group
-            className="flex flex-col p-2 bg-white rounded shadow-lg"
-            options={initialColumns.filter(c => c.key !== 'actions').map(({ key, title }) => ({ label: title as string, value: key as string }))}
-            value={visibleColumns}
-            onChange={(values) => setVisibleColumns(['actions', ...values as string[]])}
-          />
-        </Menu>
-      }
-      trigger={['click']}
-    >
-      <Button icon={<EyeOutlined />}>Columns</Button>
-    </Dropdown>
-  );
+    const handleFilterReset = () => {
+        form.resetFields();
+        setAdvancedFilters({});
+        setFilterPopoverVisible(false);
+    };
 
-  const visibleTableColumns = useMemo(
-      () => initialColumns.filter(c => visibleColumns.includes(c!.key as string)),
-      [initialColumns, visibleColumns]
-  );
+    const allColumns = useMemo(() => [
+        { title: 'Mã Chi nhánh', dataIndex: 'code', key: 'code', sorter: true },
+        { 
+          title: 'Tên Chi nhánh',
+          dataIndex: 'name',
+          key: 'name',
+          sorter: true,
+          render: (text: string, record: BranchViewData) => <Link to={`/master-data/branches/${record.id}`}>{text}</Link>
+        },
+        { title: 'Trạng thái', dataIndex: 'is_active', key: 'is_active', sorter: false, render: (isActive: boolean) => <StatusTag status={isActive} /> },
+        { title: 'Tổ chức', dataIndex: 'organization_name', key: 'organization_name', sorter: true },
+        { title: 'Địa chỉ', dataIndex: 'address', key: 'address' },
+        { title: 'Ngày tạo', dataIndex: 'created_at', key: 'created_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
+        { title: 'Người tạo', dataIndex: 'created_by_name', key: 'created_by_name' },
+        {
+            title: 'Hành động',
+            key: 'actions',
+            align: 'center' as const,
+            fixed: 'right' as const,
+            width: 100,
+            render: (_: any, record: BranchViewData) => (
+                <Space size="small">
+                     <Tooltip title="Xem chi tiết">
+                        <button className="table-action-button" onClick={() => navigate(`/master-data/branches/${record.id}`)}>
+                            <EyeOutlined />
+                        </button>
+                    </Tooltip>
+                    <Can module="masterData" action="edit">
+                        <Tooltip title="Chỉnh sửa">
+                            <button className="table-action-button" onClick={() => navigate(`/master-data/branches/${record.id}/edit`)}>
+                                <EditOutlined />
+                            </button>
+                        </Tooltip>
+                    </Can>
+                </Space>
+            ),
+        },
+    ], [navigate]);
 
-  return (
-    <Card
-        title="Branches"
-        extra={
-            <Space>
-                {columnSelector}
-                <Button icon={<FileExcelOutlined />}>Export</Button>
+    const columnToggler = (
+        <div style={{ padding: 8, width: 200 }}>
+            <Typography.Title level={5}>Tùy chỉnh cột</Typography.Title>
+            <Checkbox.Group
+                className="flex flex-col space-y-2"
+                options={allColumns.filter(c => c.key !== 'actions').map(c => ({ label: c.title, value: c.key as string }))}
+                value={visibleColumns}
+                onChange={(checkedValues) => setVisibleColumns([...checkedValues, 'actions'])}
+            />
+        </div>
+    );
+    
+    const advancedFilterForm = (
+        <div style={{ padding: 16, width: 350 }}>
+            <Typography.Title level={5}>Bộ lọc nâng cao</Typography.Title>
+            <Form form={form} layout="vertical" onFinish={handleFilterFinish}>
+                <Form.Item name="organization_id" label="Tổ chức">
+                    <Select
+                        showSearch
+                        placeholder="Chọn tổ chức"
+                        optionFilterProp="children"
+                        filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                        options={organizations.map(org => ({ value: org.id, label: org.name }))}
+                        allowClear
+                    />
+                </Form.Item>
+                <Form.Item name="status" label="Trạng thái">
+                    <Select placeholder="Chọn trạng thái" allowClear>
+                        <Select.Option value={true}>Active</Select.Option>
+                        <Select.Option value={false}>Inactive</Select.Option>
+                    </Select>
+                </Form.Item>
+                <Space>
+                    <Button onClick={handleFilterReset}>Đặt lại</Button>
+                    <Button type="primary" htmlType="submit">Xác nhận</Button>
+                </Space>
+            </Form>
+        </div>
+    );
+
+    return (
+        <Card>
+            <div className="flex justify-between items-center mb-6">
+                <Typography.Title level={4} style={{ margin: 0 }}>Branches</Typography.Title>
                 <Can module="masterData" action="create">
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/branches/create')}>
-                        Create
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/branches/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
+                        Thêm mới Chi nhánh
                     </Button>
                 </Can>
-            </Space>
-        }
-    >
-        <Row gutter={[16, 16]} className="mb-4">
-            <Col xs={24} sm={12} md={8}>
-                <Input.Search 
-                    placeholder="Search by code, name, manager..." 
-                    onSearch={setSearchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    allowClear
+            </div>
+            <div className="flex justify-between items-center mb-4">
+                <Space>
+                    <Popover content={columnToggler} trigger="click" placement="bottomLeft" visible={columnPopoverVisible} onVisibleChange={setColumnPopoverVisible}>
+                        <Button icon={<SettingOutlined />} />
+                    </Popover>
+                    <Popover content={advancedFilterForm} trigger="click" placement="bottomLeft" visible={filterPopoverVisible} onVisibleChange={setFilterPopoverVisible}>
+                        <Button icon={<FilterOutlined />} />
+                    </Popover>
+                    <Input
+                        placeholder="Tìm kiếm theo Mã, Tên..."
+                        prefix={<SearchOutlined />}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        style={{ width: 250 }}
+                        allowClear
+                    />
+                </Space>
+            </div>
+
+            <div className="modern-table-container">
+                <Table
+                    rowKey="id"
+                    columns={allColumns.filter(c => visibleColumns.includes(c.key as string))}
+                    dataSource={branches}
+                    loading={loading}
+                    pagination={false}
+                    onChange={handleTableChange}
+                    scroll={{ x: 'max-content' }}
+                    className="custom-scrollbar"
                 />
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-                <Select
-                    allowClear
-                    style={{ width: '100%' }}
-                    placeholder="Filter by status..."
-                    onChange={(value) => setStatusFilter(value === undefined ? null : value)}
-                    options={[
-                        { label: 'Active', value: true },
-                        { label: 'Inactive', value: false },
-                    ]}
-                />
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-                <Select
-                    mode="multiple"
-                    allowClear
-                    style={{ width: '100%' }}
-                    placeholder="Filter by Organization..."
-                    onChange={setOrgFilter}
-                    options={organizations.map(o => ({ label: o.name, value: o.id }))}
-                    maxTagCount="responsive"
-                />
-            </Col>
-        </Row>
-        <Spin spinning={loading}>
-          <Table
-            dataSource={filteredBranches}
-            columns={visibleTableColumns}
-            rowKey="id"
-            size="small"
-            bordered
-            scroll={{ x: 'max-content' }}
-            pagination={{ 
-                defaultPageSize: 10, 
-                showSizeChanger: true, 
-                pageSizeOptions: ['10', '20', '50'],
-                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`
-            }}
-          />
-        </Spin>
-    </Card>
-  );
+                 <div className="table-footer">
+                    <div>
+                        {totalCount > 0 && <Typography.Text>Tổng: {totalCount}</Typography.Text>}
+                    </div>
+                    <Pagination
+                        current={pagination.current}
+                        pageSize={pagination.pageSize}
+                        total={totalCount}
+                        showSizeChanger
+                        onChange={(page, pageSize) => setPagination({ current: page, pageSize })}
+                        onShowSizeChange={(_, size) => setPagination({ current: 1, pageSize: size })}
+                        pageSizeOptions={['10', '20', '50']}
+                    />
+                </div>
+            </div>
+        </Card>
+    );
 };
 
 const BranchesListPageWrapper: React.FC = () => (
-    <App><BranchesListPage /></App>
+    <App>
+        <BranchesListPage />
+    </App>
 );
 
 export default BranchesListPageWrapper;

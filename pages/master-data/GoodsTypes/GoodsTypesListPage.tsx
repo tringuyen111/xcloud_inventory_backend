@@ -1,205 +1,265 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, Dropdown, Menu, Checkbox } from 'antd';
-import { EyeOutlined, PlusOutlined, EditOutlined, FileExcelOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import {
+    App,
+    Button,
+    Card,
+    Input,
+    Table,
+    Space,
+    Typography,
+    Pagination,
+    Tooltip,
+    Popover,
+    Checkbox,
+    Form,
+    Select,
+    DatePicker,
+} from 'antd';
+import {
+    PlusOutlined,
+    SearchOutlined,
+    EditOutlined,
+    EyeOutlined,
+    FilterOutlined,
+    SettingOutlined,
+} from '@ant-design/icons';
+import { supabase } from '../../../lib/supabase';
 import { useDebounce } from '../../../hooks/useDebounce';
-import { goodsTypeAPI } from '../../../utils/apiClient';
-import { Database } from '../../../types/supabase';
 import Can from '../../../components/auth/Can';
+import dayjs from 'dayjs';
+import StatusTag from '../../../components/shared/StatusTag';
+import { TablePaginationConfig } from 'antd/lib/table';
+import { SorterResult } from 'antd/lib/table/interface';
 
-type GoodsType = Database['master']['Tables']['goods_types']['Row'];
+const { RangePicker } = DatePicker;
 
-// Type for the Ant Design Tree Table node, which includes tree-specific props.
-type GoodsTypeTreeNode = GoodsType & {
-  children?: GoodsTypeTreeNode[];
-  key: string;
-};
-
-const buildTreeData = (items: GoodsType[], parentId: string | null = null): GoodsTypeTreeNode[] => {
-    return items
-        .filter(item => item.parent_id === parentId)
-        .map(item => {
-            const children = buildTreeData(items, item.id);
-            return {
-                ...item,
-                key: item.id,
-                ...(children.length > 0 && { children }),
-            };
-        });
+// Type for the data returned by v_product_types_list view / get_product_types_list RPC
+type ProductTypeViewData = {
+  id: number;
+  code: string;
+  name: string;
+  is_active: boolean;
+  description: string | null;
+  created_at: string;
+  created_by_name: string | null;
 };
 
 const GoodsTypesListPage: React.FC = () => {
-  const [allGoodsTypes, setAllGoodsTypes] = useState<GoodsType[]>([]);
-  const [treeData, setTreeData] = useState<GoodsTypeTreeNode[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<boolean | null>(null);
+    const navigate = useNavigate();
+    const { notification } = App.useApp();
+    const [form] = Form.useForm();
 
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const navigate = useNavigate();
-  const { notification } = App.useApp();
+    const [productTypes, setProductTypes] = useState<ProductTypeViewData[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [totalCount, setTotalCount] = useState(0);
+    const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
+    const [sorter, setSorter] = useState<SorterResult<ProductTypeViewData> | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  const goodsTypesMap = useMemo(() => new Map(allGoodsTypes.map(item => [item.id, item.name])), [allGoodsTypes]);
+    const [advancedFilters, setAdvancedFilters] = useState<any>({});
+    const [filterPopoverVisible, setFilterPopoverVisible] = useState(false);
+    const [columnPopoverVisible, setColumnPopoverVisible] = useState(false);
 
-  const columns = useMemo(() => [
-    { title: 'Name', dataIndex: 'name', key: 'name', sorter: (a: GoodsType, b: GoodsType) => a.name.localeCompare(b.name) },
-    { title: 'Code', dataIndex: 'code', key: 'code', sorter: (a: GoodsType, b: GoodsType) => a.code.localeCompare(b.code) },
-    { 
-      title: 'Parent', 
-      dataIndex: 'parent_id', 
-      key: 'parent', 
-      render: (parentId: string | null) => parentId ? goodsTypesMap.get(parentId) || '-' : '-'
-    },
-    {
-      title: 'Status',
-      dataIndex: 'is_active',
-      key: 'is_active',
-      render: (isActive: boolean) => <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'ACTIVE' : 'INACTIVE'}</Tag>,
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_: any, record: GoodsType) => (
-        <Space size="middle">
-          <Tooltip title="View Details"><Button icon={<EyeOutlined />} onClick={() => navigate(`/master-data/goods-types/${record.id}`)} /></Tooltip>
-          <Can module="masterData" action="edit">
-            <Tooltip title="Edit"><Button icon={<EditOutlined />} onClick={() => navigate(`/master-data/goods-types/${record.id}/edit`)} /></Tooltip>
-          </Can>
-        </Space>
-      ),
-    },
-  ], [navigate, goodsTypesMap]);
-  
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => columns.map(c => c.key as string));
+    const defaultColumns = ['code', 'name', 'is_active', 'created_at', 'created_by_name', 'actions'];
+    const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns);
 
-  useEffect(() => {
-    const fetchGoodsTypes = async () => {
-      setLoading(true);
-      try {
-        const data = await goodsTypeAPI.list();
-        setAllGoodsTypes(data || []);
-      } catch (error: any) {
-        notification.error({ message: 'Error fetching Goods Types', description: error.message });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchGoodsTypes();
-  }, [notification]);
+    const fetchProductTypes = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { current, pageSize } = pagination;
+            const params = {
+                p_page_number: current,
+                p_page_size: pageSize,
+                p_search_text: debouncedSearchTerm || null,
+                p_sort_by: sorter?.field as string || 'created_at',
+                p_sort_order: sorter?.order === 'ascend' ? 'asc' : 'desc',
+                p_status: advancedFilters.status,
+                p_date_range: advancedFilters.date_range ? { 
+                    start: dayjs(advancedFilters.date_range[0]).startOf('day').toISOString(), 
+                    end: dayjs(advancedFilters.date_range[1]).endOf('day').toISOString()
+                } : null,
+            };
 
-  useEffect(() => {
-    if (!debouncedSearchTerm && statusFilter === null) {
-      setTreeData(buildTreeData(allGoodsTypes));
-      return;
-    }
+            const { data, error } = await supabase.rpc('get_product_types_list', params);
 
-    const goodsTypesIdMap = new Map(allGoodsTypes.map(item => [item.id, item]));
-    
-    let matchedNodes = [...allGoodsTypes];
+            if (error) throw error;
+            
+            const result = data as { data: ProductTypeViewData[], total_count: number };
+            setProductTypes(result.data || []);
+            setTotalCount(result.total_count || 0);
 
-    if (debouncedSearchTerm) {
-        const lowercasedFilter = debouncedSearchTerm.toLowerCase();
-        matchedNodes = matchedNodes.filter(item =>
-            item.code.toLowerCase().includes(lowercasedFilter) ||
-            item.name.toLowerCase().includes(lowercasedFilter)
-        );
-    }
-    
-    if (statusFilter !== null) {
-        matchedNodes = matchedNodes.filter(item => item.is_active === statusFilter);
-    }
-    
-    const finalNodes = new Map<string, GoodsType>();
-
-    const addWithAncestors = (node: GoodsType) => {
-        if (!node || finalNodes.has(node.id)) return;
-        
-        finalNodes.set(node.id, node);
-        
-        if (node.parent_id) {
-            const parent = goodsTypesIdMap.get(node.parent_id);
-            if (parent) {
-                addWithAncestors(parent as GoodsType);
-            }
+        } catch (error: any) {
+            notification.error({
+                message: 'Error fetching product types',
+                description: `RPC Error: ${error.message}. Ensure the 'get_product_types_list' function exists and accepts all required parameters.`,
+            });
+        } finally {
+            setLoading(false);
         }
+    }, [pagination, sorter, debouncedSearchTerm, advancedFilters, notification]);
+
+    useEffect(() => {
+        fetchProductTypes();
+    }, [fetchProductTypes]);
+
+    const handleTableChange = (
+        pagination: TablePaginationConfig, 
+        filters: any, 
+        sorter: SorterResult<ProductTypeViewData> | SorterResult<ProductTypeViewData>[]
+    ) => {
+        setPagination(prev => ({ ...prev, current: pagination.current || 1 }));
+        const currentSorter = Array.isArray(sorter) ? sorter[0] : sorter;
+        setSorter(currentSorter.field && currentSorter.order ? currentSorter : null);
     };
 
-    matchedNodes.forEach(node => addWithAncestors(node));
+    const handleFilterFinish = (values: any) => {
+        setAdvancedFilters(values);
+        setFilterPopoverVisible(false);
+    };
+
+    const handleFilterReset = () => {
+        form.resetFields();
+        setAdvancedFilters({});
+        setFilterPopoverVisible(false);
+    };
+
+    const allColumns = useMemo(() => [
+        { title: 'Mã', dataIndex: 'code', key: 'code', sorter: true },
+        { 
+          title: 'Tên Loại SP',
+          dataIndex: 'name',
+          key: 'name',
+          sorter: true,
+          render: (text: string, record: ProductTypeViewData) => <Link to={`/master-data/goods-types/${record.id}`}>{text}</Link>
+        },
+        { title: 'Trạng thái', dataIndex: 'is_active', key: 'is_active', sorter: true, render: (isActive: boolean) => <StatusTag status={isActive} /> },
+        { title: 'Mô tả', dataIndex: 'description', key: 'description' },
+        { title: 'Ngày tạo', dataIndex: 'created_at', key: 'created_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
+        { title: 'Người tạo', dataIndex: 'created_by_name', key: 'created_by_name' },
+        {
+            title: 'Hành động',
+            key: 'actions',
+            align: 'center' as const,
+            fixed: 'right' as const,
+            width: 100,
+            render: (_: any, record: ProductTypeViewData) => (
+                <Space size="small">
+                     <Tooltip title="Xem chi tiết">
+                        <button className="table-action-button" onClick={() => navigate(`/master-data/goods-types/${record.id}`)}>
+                            <EyeOutlined />
+                        </button>
+                    </Tooltip>
+                    <Can module="masterData" action="edit">
+                        <Tooltip title="Chỉnh sửa">
+                            <button className="table-action-button" onClick={() => navigate(`/master-data/goods-types/${record.id}/edit`)}>
+                                <EditOutlined />
+                            </button>
+                        </Tooltip>
+                    </Can>
+                </Space>
+            ),
+        },
+    ], [navigate]);
+
+    const columnToggler = (
+        <div style={{ padding: 8, width: 200 }}>
+            <Typography.Title level={5}>Tùy chỉnh cột</Typography.Title>
+            <Checkbox.Group
+                className="flex flex-col space-y-2"
+                options={allColumns.filter(c => c.key !== 'actions').map(c => ({ label: c.title, value: c.key as string }))}
+                value={visibleColumns}
+                onChange={(checkedValues) => setVisibleColumns([...checkedValues, 'actions'])}
+            />
+        </div>
+    );
     
-    const tree = buildTreeData(Array.from(finalNodes.values()));
-    setTreeData(tree);
-  }, [debouncedSearchTerm, statusFilter, allGoodsTypes]);
+    const advancedFilterForm = (
+        <div style={{ padding: 16, width: 350 }}>
+            <Typography.Title level={5}>Bộ lọc nâng cao</Typography.Title>
+            <Form form={form} layout="vertical" onFinish={handleFilterFinish}>
+                <Form.Item name="status" label="Trạng thái">
+                    <Select placeholder="Chọn trạng thái" allowClear>
+                        <Select.Option value={true}>Active</Select.Option>
+                        <Select.Option value={false}>Inactive</Select.Option>
+                    </Select>
+                </Form.Item>
+                 <Form.Item name="date_range" label="Khoảng ngày tạo">
+                    <RangePicker style={{ width: '100%' }} />
+                </Form.Item>
+                <Space>
+                    <Button onClick={handleFilterReset}>Đặt lại</Button>
+                    <Button type="primary" htmlType="submit">Xác nhận</Button>
+                </Space>
+            </Form>
+        </div>
+    );
 
-  const columnSelector = (
-    <Dropdown
-      overlay={
-        <Menu>
-          <Checkbox.Group
-            className="flex flex-col p-2"
-            options={columns.map(({ key, title }) => ({ label: title as string, value: key as string }))}
-            value={visibleColumns}
-            onChange={(values) => setVisibleColumns(values as string[])}
-          />
-        </Menu>
-      }
-      trigger={['click']}
-    >
-      <Button icon={<EyeOutlined />}>Columns</Button>
-    </Dropdown>
-  );
-
-  return (
-    <Card
-        title="Goods Types"
-        extra={
-            <Space>
-                {columnSelector}
-                <Button icon={<FileExcelOutlined />}>Export</Button>
+    return (
+        <Card>
+            <div className="flex justify-between items-center mb-6">
+                <Typography.Title level={4} style={{ margin: 0 }}>Product Types</Typography.Title>
                 <Can module="masterData" action="create">
-                  <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/goods-types/create')}>Create</Button>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/goods-types/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
+                        Thêm mới Loại SP
+                    </Button>
                 </Can>
-            </Space>
-        }
-    >
-        <Row gutter={[16, 16]} className="mb-4">
-            <Col xs={24} sm={12} md={8}>
-                <Input.Search 
-                    placeholder="Search by code or name..." 
-                    onSearch={setSearchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    allowClear
+            </div>
+            <div className="flex justify-between items-center mb-4">
+                <Space>
+                    <Popover content={columnToggler} trigger="click" placement="bottomLeft" visible={columnPopoverVisible} onVisibleChange={setColumnPopoverVisible}>
+                        <Button icon={<SettingOutlined />} />
+                    </Popover>
+                    <Popover content={advancedFilterForm} trigger="click" placement="bottomLeft" visible={filterPopoverVisible} onVisibleChange={setFilterPopoverVisible}>
+                        <Button icon={<FilterOutlined />} />
+                    </Popover>
+                    <Input
+                        placeholder="Tìm kiếm theo Tên, Mã..."
+                        prefix={<SearchOutlined />}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        style={{ width: 250 }}
+                        allowClear
+                    />
+                </Space>
+            </div>
+
+            <div className="modern-table-container">
+                <Table
+                    rowKey="id"
+                    columns={allColumns.filter(c => visibleColumns.includes(c.key as string))}
+                    dataSource={productTypes}
+                    loading={loading}
+                    pagination={false}
+                    onChange={handleTableChange}
+                    scroll={{ x: 'max-content' }}
+                    className="custom-scrollbar"
                 />
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-                <Select
-                    allowClear
-                    style={{ width: '100%' }}
-                    placeholder="Filter by status..."
-                    onChange={(value) => setStatusFilter(value === undefined ? null : value)}
-                    options={[
-                        { label: 'Active', value: true },
-                        { label: 'Inactive', value: false },
-                    ]}
-                />
-            </Col>
-        </Row>
-        <Spin spinning={loading}>
-          <Table 
-            dataSource={treeData} 
-            columns={columns.filter(c => visibleColumns.includes(c.key as string))} 
-            rowKey="id" 
-            size="small" 
-            bordered 
-            pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '20', '50'] }}
-          />
-        </Spin>
-    </Card>
-  );
+                 <div className="table-footer">
+                    <div>
+                        {totalCount > 0 && <Typography.Text>Tổng: {totalCount}</Typography.Text>}
+                    </div>
+                    <Pagination
+                        current={pagination.current}
+                        pageSize={pagination.pageSize}
+                        total={totalCount}
+                        showSizeChanger
+                        onChange={(page, pageSize) => setPagination({ current: page, pageSize })}
+                        onShowSizeChange={(_, size) => setPagination({ current: 1, pageSize: size })}
+                        pageSizeOptions={['10', '20', '50']}
+                    />
+                </div>
+            </div>
+        </Card>
+    );
 };
 
 const GoodsTypesListPageWrapper: React.FC = () => (
-    <App><GoodsTypesListPage /></App>
+    <App>
+        <GoodsTypesListPage />
+    </App>
 );
 
 export default GoodsTypesListPageWrapper;

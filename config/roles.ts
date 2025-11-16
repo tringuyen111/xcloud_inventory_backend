@@ -12,6 +12,7 @@ const permissions = {
   navigation: {
     viewDashboard: [ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER, ROLES.WAREHOUSE_STAFF],
     viewOperations: [ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER, ROLES.WAREHOUSE_STAFF],
+    viewProduct: [ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER],
     viewMasterData: [ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER],
     viewReports: [ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER],
     viewSettings: [ROLES.ADMIN],

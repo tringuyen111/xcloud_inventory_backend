@@ -3,7 +3,7 @@ import { useUserProfile } from './useUserProfile';
 
 export const useAuth = () => {
     const { session, user, loading: authLoading } = useAuthStore();
-    const { profile, loading: profileLoading, error: profileError } = useUserProfile();
+    const { profile, loading: profileLoading, error: profileError, refetch: refetchUserProfile } = useUserProfile();
 
     return {
         session,
@@ -13,5 +13,6 @@ export const useAuth = () => {
         isAuthenticated: !!session && !!user,
         isLoading: authLoading || profileLoading,
         error: profileError,
+        refetchUserProfile,
     };
 };

@@ -1,9 +1,9 @@
 import React from 'react';
-import { Card } from 'antd';
+import { Card, Empty } from 'antd';
 
 const PlaceholderPage: React.FC = () => (
     <Card>
-        Content cleared as requested. This component is ready for new implementation.
+        <Empty description="Content cleared as requested. This component is ready for new implementation." />
     </Card>
 );
 

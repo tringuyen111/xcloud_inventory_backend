@@ -1,3 +1,5 @@
+
+
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Spin, ConfigProvider, App as AntdApp } from 'antd';
@@ -71,6 +73,12 @@ import PutawayCreatePage from './pages/operations/Putaway/PutawayCreatePage';
 import ReportsPage from './pages/reports/ReportsPage';
 import UserListPage from './pages/settings/UserListPage';
 import UserFormPage from './pages/settings/UserFormPage';
+import RolesListPage from './pages/settings/RolesListPage';
+import RoleFormPage from './pages/settings/RoleFormPage';
+import PermissionMatrixPage from './pages/settings/PermissionMatrixPage';
+import ProfilePage from './pages/settings/ProfilePage';
+import LotsSerialsListPage from './pages/settings/LotsSerialsListPage';
+
 
 import DbSchemaPage from './pages/dev/DbSchemaPage';
 import SupabaseMcpPage from './pages/dev/SupabaseMcpPage';
@@ -105,7 +113,29 @@ const App: React.FC = () => {
     }
   
     return (
-      <ConfigProvider>
+      <ConfigProvider
+        theme={{
+          token: {
+            colorPrimary: '#5664d2',
+            borderRadius: 6,
+          },
+          components: {
+            Button: {
+              controlHeight: 40,
+            },
+            Input: {
+              controlHeight: 40,
+            },
+            Select: {
+              controlHeight: 40,
+            },
+            Card: {
+              headerBg: 'white',
+              paddingLG: 24,
+            }
+          },
+        }}
+      >
         <AntdApp>
           <HashRouter>
             <Routes>
@@ -115,7 +145,9 @@ const App: React.FC = () => {
                 <Route element={<ProtectedRoutesGuard />}>
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/profile" element={<ProfilePage />} />
                     
+
                     {/* Operations */}
                     <Route path="/operations/onhand" element={<OnhandListPage />} />
                     <Route path="/operations/onhand/:warehouseId/:goodsModelId" element={<OnhandDetailPage />} />
@@ -160,25 +192,26 @@ const App: React.FC = () => {
                     <Route path="/master-data/partners/:id" element={<RouteGuard module="navigation" action="viewMasterData"><PartnerDetailPage /></RouteGuard>} />
                     <Route path="/master-data/partners/:id/edit" element={<RouteGuard module="masterData" action="edit"><PartnerFormPage /></RouteGuard>} />
                     
-                    <Route path="/master-data/uom-categories" element={<RouteGuard module="navigation" action="viewMasterData"><UomCategoriesListPage /></RouteGuard>} />
-                    <Route path="/master-data/uom-categories/create" element={<RouteGuard module="masterData" action="create"><UomCategoryFormPage /></RouteGuard>} />
-                    <Route path="/master-data/uom-categories/:id" element={<RouteGuard module="navigation" action="viewMasterData"><UomCategoryDetailPage /></RouteGuard>} />
-                    <Route path="/master-data/uom-categories/:id/edit" element={<RouteGuard module="masterData" action="edit"><UomCategoryFormPage /></RouteGuard>} />
+                    {/* Product Data */}
+                    <Route path="/product/uom-categories" element={<RouteGuard module="navigation" action="viewProduct"><UomCategoriesListPage /></RouteGuard>} />
+                    <Route path="/product/uom-categories/create" element={<RouteGuard module="masterData" action="create"><UomCategoryFormPage /></RouteGuard>} />
+                    <Route path="/product/uom-categories/:id" element={<RouteGuard module="navigation" action="viewProduct"><UomCategoryDetailPage /></RouteGuard>} />
+                    <Route path="/product/uom-categories/:id/edit" element={<RouteGuard module="masterData" action="edit"><UomCategoryFormPage /></RouteGuard>} />
                     
-                    <Route path="/master-data/uoms" element={<RouteGuard module="navigation" action="viewMasterData"><UomsListPage /></RouteGuard>} />
-                    <Route path="/master-data/uoms/create" element={<RouteGuard module="masterData" action="create"><UomFormPage /></RouteGuard>} />
-                    <Route path="/master-data/uoms/:id" element={<RouteGuard module="navigation" action="viewMasterData"><UomDetailPage /></RouteGuard>} />
-                    <Route path="/master-data/uoms/:id/edit" element={<RouteGuard module="masterData" action="edit"><UomFormPage /></RouteGuard>} />
+                    <Route path="/product/uoms" element={<RouteGuard module="navigation" action="viewProduct"><UomsListPage /></RouteGuard>} />
+                    <Route path="/product/uoms/create" element={<RouteGuard module="masterData" action="create"><UomFormPage /></RouteGuard>} />
+                    <Route path="/product/uoms/:id" element={<RouteGuard module="navigation" action="viewProduct"><UomDetailPage /></RouteGuard>} />
+                    <Route path="/product/uoms/:id/edit" element={<RouteGuard module="masterData" action="edit"><UomFormPage /></RouteGuard>} />
                     
-                    <Route path="/master-data/goods-types" element={<RouteGuard module="navigation" action="viewMasterData"><GoodsTypesListPage /></RouteGuard>} />
-                    <Route path="/master-data/goods-types/create" element={<RouteGuard module="masterData" action="create"><GoodsTypeFormPage /></RouteGuard>} />
-                    <Route path="/master-data/goods-types/:id" element={<RouteGuard module="navigation" action="viewMasterData"><GoodsTypeDetailPage /></RouteGuard>} />
-                    <Route path="/master-data/goods-types/:id/edit" element={<RouteGuard module="masterData" action="edit"><GoodsTypeFormPage /></RouteGuard>} />
+                    <Route path="/product/goods-types" element={<RouteGuard module="navigation" action="viewProduct"><GoodsTypesListPage /></RouteGuard>} />
+                    <Route path="/product/goods-types/create" element={<RouteGuard module="masterData" action="create"><GoodsTypeFormPage /></RouteGuard>} />
+                    <Route path="/product/goods-types/:id" element={<RouteGuard module="navigation" action="viewProduct"><GoodsTypeDetailPage /></RouteGuard>} />
+                    <Route path="/product/goods-types/:id/edit" element={<RouteGuard module="masterData" action="edit"><GoodsTypeFormPage /></RouteGuard>} />
                    
-                    <Route path="/master-data/goods-models" element={<RouteGuard module="navigation" action="viewMasterData"><GoodsModelsListPage /></RouteGuard>} />
-                    <Route path="/master-data/goods-models/create" element={<RouteGuard module="masterData" action="create"><GoodsModelFormPage /></RouteGuard>} />
-                    <Route path="/master-data/goods-models/:id" element={<RouteGuard module="navigation" action="viewMasterData"><GoodsModelDetailPage /></RouteGuard>} />
-                    <Route path="/master-data/goods-models/:id/edit" element={<RouteGuard module="masterData" action="edit"><GoodsModelFormPage /></RouteGuard>} />
+                    <Route path="/product/goods-models" element={<RouteGuard module="navigation" action="viewProduct"><GoodsModelsListPage /></RouteGuard>} />
+                    <Route path="/product/goods-models/create" element={<RouteGuard module="masterData" action="create"><GoodsModelFormPage /></RouteGuard>} />
+                    <Route path="/product/goods-models/:id" element={<RouteGuard module="navigation" action="viewProduct"><GoodsModelDetailPage /></RouteGuard>} />
+                    <Route path="/product/goods-models/:id/edit" element={<RouteGuard module="masterData" action="edit"><GoodsModelFormPage /></RouteGuard>} />
 
                     {/* Other */}
                     <Route path="/reports" element={<RouteGuard module="navigation" action="viewReports"><ReportsPage /></RouteGuard>} />
@@ -187,6 +220,10 @@ const App: React.FC = () => {
                     <Route path="/settings/users" element={<RouteGuard module="navigation" action="viewSettings"><UserListPage /></RouteGuard>} />
                     <Route path="/settings/users/create" element={<RouteGuard module="settings" action="manageUsers"><UserFormPage /></RouteGuard>} />
                     <Route path="/settings/users/:id/edit" element={<RouteGuard module="settings" action="manageUsers"><UserFormPage /></RouteGuard>} />
+                    <Route path="/settings/roles" element={<RouteGuard module="navigation" action="viewSettings"><RolesListPage /></RouteGuard>} />
+                    <Route path="/settings/roles/:id/permissions" element={<RouteGuard module="settings" action="manageUsers"><RoleFormPage /></RouteGuard>} />
+                    <Route path="/settings/lots-serials" element={<RouteGuard module="navigation" action="viewSettings"><LotsSerialsListPage /></RouteGuard>} />
+
                     
                     <Route path="/dev/db-schema" element={<RouteGuard module="navigation" action="viewDeveloper"><DbSchemaPage /></RouteGuard>} />
                     <Route path="/dev/supabase-mcp" element={<RouteGuard module="navigation" action="viewDeveloper"><SupabaseMcpPage /></RouteGuard>} />

@@ -1,3 +1,5 @@
+
+
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import useUIStore from '../../stores/uiStore';
@@ -16,21 +18,28 @@ interface NavItem {
 
 const DashboardIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>;
 const CubeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>;
-const CogIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066 2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
+const CogIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066 2.573c-.94-1.543.826 3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
 const ChartBarIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>;
 const CodeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>;
 const ChevronDownIcon = ({ className }: { className?: string }) => <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${className || ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>;
+const ArchiveIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>;
 
 // FIX: Changed type from Omit<...> to NavItem[] to align with the updated NavItem interface.
 const navItems: NavItem[] = [
     { name: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
+    { name: 'Onhand', path: '/operations/onhand', icon: <ArchiveIcon /> },
     { name: 'Operations', path: '/operations', icon: <CogIcon />, subItems: [
         { name: 'Goods Receipt', path: '/operations/gr', icon: <div/> },
         { name: 'Putaway', path: '/operations/pa', icon: <div/> },
-        { name: 'Onhand', path: '/operations/onhand', icon: <div/> },
         { name: 'Inventory Count', path: '/operations/ic', icon: <div/> },
         { name: 'Goods Issue', path: '/operations/gi', icon: <div/> },
         { name: 'Goods Transfer', path: '/operations/gt', icon: <div/> },
+    ]},
+    { name: 'Product', path: '/product', icon: <CubeIcon />, subItems: [
+        { name: 'Goods Types', path: '/product/goods-types', icon: <div/> },
+        { name: 'Goods Models', path: '/product/goods-models', icon: <div/> },
+        { name: 'UoM Categories', path: '/product/uom-categories', icon: <div/> },
+        { name: 'Units of Measure', path: '/product/uoms', icon: <div/> },
     ]},
     { name: 'Master Data', path: '/master-data', icon: <CubeIcon />, subItems: [
         { name: 'Organizations', path: '/master-data/organizations', icon: <div/> },
@@ -38,14 +47,13 @@ const navItems: NavItem[] = [
         { name: 'Warehouses', path: '/master-data/warehouses', icon: <div/> },
         { name: 'Locations', path: '/master-data/locations', icon: <div/> },
         { name: 'Partners', path: '/master-data/partners', icon: <div/> },
-        { name: 'UoM Categories', path: '/master-data/uom-categories', icon: <div/> },
-        { name: 'Units of Measure', path: '/master-data/uoms', icon: <div/> },
-        { name: 'Goods Types', path: '/master-data/goods-types', icon: <div/> },
-        { name: 'Goods Models', path: '/master-data/goods-models', icon: <div/> },
     ]},
     { name: 'Reports', path: '/reports', icon: <ChartBarIcon /> },
     { name: 'Settings', path: '/settings', icon: <CogIcon />, subItems: [
+        { name: 'My Profile', path: '/profile', icon: <div/> },
         { name: 'User Management', path: '/settings/users', icon: <div/> },
+        { name: 'Roles Management', path: '/settings/roles', icon: <div/> },
+        { name: 'Lots & Serials', path: '/settings/lots-serials', icon: <div/> },
     ]},
     { name: 'Developer', path: '/dev', icon: <CodeIcon />, subItems: [
         { name: 'DB Schema', path: '/dev/db-schema', icon: <div/> },
@@ -53,11 +61,12 @@ const navItems: NavItem[] = [
 ];
 
 // FIX: Defined a specific type for navigation actions to match the expected signature of `hasPermission`.
-type NavigationAction = "viewDashboard" | "viewOperations" | "viewMasterData" | "viewReports" | "viewSettings" | "viewDeveloper" | "viewGR" | "viewPA" | "viewOnhand" | "viewIC" | "viewGI" | "viewGT";
+type NavigationAction = "viewDashboard" | "viewOperations" | "viewMasterData" | "viewReports" | "viewSettings" | "viewDeveloper" | "viewGR" | "viewPA" | "viewOnhand" | "viewIC" | "viewGI" | "viewGT" | "viewProduct";
 
 const permissionMap: Record<string, { module: 'navigation', action: NavigationAction }> = {
     '/dashboard': { module: 'navigation', action: 'viewDashboard' },
     '/operations': { module: 'navigation', action: 'viewOperations' },
+    '/product': { module: 'navigation', action: 'viewProduct' },
     '/master-data': { module: 'navigation', action: 'viewMasterData' },
     '/reports': { module: 'navigation', action: 'viewReports' },
     '/settings': { module: 'navigation', action: 'viewSettings' },
@@ -69,6 +78,9 @@ const permissionMap: Record<string, { module: 'navigation', action: NavigationAc
     '/operations/ic': { module: 'navigation', action: 'viewIC' },
     '/operations/gi': { module: 'navigation', action: 'viewGI' },
     '/operations/gt': { module: 'navigation', action: 'viewGT' },
+    '/settings/roles': { module: 'navigation', action: 'viewSettings' },
+    '/settings/permission-matrix': { module: 'navigation', action: 'viewSettings' },
+    '/settings/lots-serials': { module: 'navigation', action: 'viewSettings' },
 };
 
 const Sidebar: React.FC = () => {
@@ -94,6 +106,9 @@ const Sidebar: React.FC = () => {
 
     const renderNavItems = (items: typeof navItems) => {
         const accessibleItems = items.filter(item => {
+            // Profile link is always visible for logged in users, no specific permission needed
+            if (item.path === '/profile') return true;
+
             const perm = permissionMap[item.path];
             // If there's a permission rule, check it. If not, assume it's a structural item (like a sub-menu parent) and check its children later.
             return perm ? hasPermission(role as Role, perm.module, perm.action) : true;
@@ -105,6 +120,8 @@ const Sidebar: React.FC = () => {
 
             if (item.subItems) {
                 const accessibleSubItems = item.subItems.filter(subItem => {
+                    // Always show "My Profile"
+                    if (subItem.path === '/profile') return true;
                     const perm = permissionMap[subItem.path];
                     // Show sub-item if it has no specific rule or if the user has permission
                     return !perm || hasPermission(role as Role, perm.module, perm.action);
@@ -117,7 +134,7 @@ const Sidebar: React.FC = () => {
                 
                 return (
                     <div key={item.name}>
-                        <button onClick={() => toggleMenu(item.path)} className={`w-full flex justify-between items-center text-left py-3 px-4 rounded-md transition-colors duration-200 ${isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`}>
+                        <button onClick={() => toggleMenu(item.path)} className={`w-full flex justify-between items-center text-left py-3 px-4 rounded-md transition-colors duration-200 ${isActive ? 'bg-[#5664d2] text-white' : 'text-gray-400 hover:bg-white hover:bg-opacity-10 hover:text-white'}`}>
                             <div className="flex items-center space-x-3">
                                 {item.icon}
                                 <span>{item.name}</span>
@@ -132,7 +149,7 @@ const Sidebar: React.FC = () => {
                                         <NavLink
                                             key={subItem.name}
                                             to={subItem.path}
-                                            className={`block py-2 px-3 rounded-md text-sm transition-colors duration-200 ${isSubActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`}>
+                                            className={`block py-2 px-3 rounded-md text-sm transition-colors duration-200 ${isSubActive ? 'bg-[#5664d2] text-white' : 'text-gray-400 hover:bg-white hover:bg-opacity-10 hover:text-white'}`}>
                                             {subItem.name}
                                         </NavLink>
                                     )
@@ -147,7 +164,7 @@ const Sidebar: React.FC = () => {
                 <NavLink
                     key={item.name}
                     to={item.path}
-                    className={`flex items-center space-x-3 py-3 px-4 rounded-md transition-colors duration-200 ${isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`}
+                    className={`flex items-center space-x-3 py-3 px-4 rounded-md transition-colors duration-200 ${isActive ? 'bg-[#5664d2] text-white' : 'text-gray-400 hover:bg-white hover:bg-opacity-10 hover:text-white'}`}
                 >
                     {item.icon}
                     <span>{item.name}</span>
@@ -157,9 +174,12 @@ const Sidebar: React.FC = () => {
     };
 
     return (
-        <aside className={`bg-gray-800 text-white transition-all duration-300 ease-in-out ${isOpen ? 'w-64' : 'w-0'} h-full flex-col flex-shrink-0 flex`}>
-            <div className="flex items-center justify-center h-16 border-b border-gray-700 flex-shrink-0">
-                <h1 className="text-2xl font-bold text-white">XCloud</h1>
+        <aside className={`bg-[#0D172A] text-white transition-all duration-300 ease-in-out ${isOpen ? 'w-64' : 'w-0'} h-full flex-col flex-shrink-0 flex`}>
+            <div className="flex items-center justify-center h-16 border-b border-gray-700/50 flex-shrink-0 px-4">
+                <h1 className="text-xl font-bold text-white whitespace-nowrap">
+                    <span className='text-indigo-400'>Inventory</span>
+                    <span className='text-gray-300'> XCloud</span>
+                </h1>
             </div>
             <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto custom-scrollbar">
                 {isLoading ? (

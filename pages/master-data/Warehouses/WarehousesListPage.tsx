@@ -1,207 +1,303 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, Dropdown, Menu, Checkbox } from 'antd';
-import { EyeOutlined, PlusOutlined, EditOutlined, FileExcelOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
-import { useDebounce } from '../../../hooks/useDebounce';
-import { warehouseAPI, branchAPI } from '../../../utils/apiClient';
-import { Database } from '../../../types/supabase';
-import dayjs from 'dayjs';
-import type { TableProps } from 'antd';
-import Can from '../../../components/auth/Can';
 
-type Warehouse = Database['master']['Tables']['warehouses']['Row'];
-type Branch = Database['master']['Tables']['branches']['Row'];
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import {
+    App,
+    Button,
+    Card,
+    Input,
+    Table,
+    Space,
+    Typography,
+    Pagination,
+    Tooltip,
+    Popover,
+    Checkbox,
+    Form,
+    Select,
+    DatePicker,
+    Tag,
+} from 'antd';
+import {
+    PlusOutlined,
+    SearchOutlined,
+    EditOutlined,
+    EyeOutlined,
+    FilterOutlined,
+    SettingOutlined,
+} from '@ant-design/icons';
+import { supabase } from '../../../lib/supabase';
+import { useDebounce } from '../../../hooks/useDebounce';
+import Can from '../../../components/auth/Can';
+import dayjs from 'dayjs';
+import StatusTag from '../../../components/shared/StatusTag';
+import { TablePaginationConfig } from 'antd/lib/table';
+import { SorterResult } from 'antd/lib/table/interface';
+
+const { RangePicker } = DatePicker;
+
+// Type for the data returned by v_warehouses_list view / get_warehouses_list RPC
+type WarehouseViewData = {
+  id: number;
+  code: string;
+  name: string;
+  is_active: boolean;
+  branch_name: string;
+  address: string | null;
+  created_at: string;
+  created_by_name: string | null;
+  updated_at: string;
+  updated_by_name: string | null;
+};
+
+// Type for branch data for filter dropdown
+type BranchFilterData = {
+    id: number;
+    name: string;
+};
 
 const WarehousesListPage: React.FC = () => {
-  const [allWarehouses, setAllWarehouses] = useState<Warehouse[]>([]);
-  const [filteredWarehouses, setFilteredWarehouses] = useState<Warehouse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [branches, setBranches] = useState<Pick<Branch, 'id' | 'name'>[]>([]);
-  
-  // Filter states
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<boolean | null>(null);
-  const [branchFilter, setBranchFilter] = useState<string[]>([]);
-  
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const navigate = useNavigate();
-  const { notification } = App.useApp();
-  
-  const branchesMap = useMemo(() => new Map(branches.map(b => [b.id, b.name])), [branches]);
+    const navigate = useNavigate();
+    const { notification } = App.useApp();
+    const [form] = Form.useForm();
 
-  const initialColumns: TableProps<Warehouse>['columns'] = useMemo(() => [
-    { title: 'Warehouse Code', dataIndex: 'code', key: 'code', sorter: (a, b) => a.code.localeCompare(b.code) },
-    { title: 'Warehouse Name', dataIndex: 'name', key: 'name', sorter: (a, b) => a.name.localeCompare(b.name) },
-    { 
-      title: 'Branch', 
-      dataIndex: 'branch_id', 
-      key: 'branch_id', 
-      render: (id: string) => branchesMap.get(id) || id,
-      sorter: (a, b) => (branchesMap.get(a.branch_id) || '').localeCompare(branchesMap.get(b.branch_id) || '')
-    },
-    { title: 'Manager', dataIndex: 'manager_name', key: 'manager_name' },
-    {
-      title: 'Status',
-      dataIndex: 'is_active',
-      key: 'is_active',
-      render: (isActive: boolean) => <Tag color={isActive ? 'green' : 'red'}>{isActive ? 'ACTIVE' : 'INACTIVE'}</Tag>,
-    },
-    {
-      title: 'Last Updated',
-      dataIndex: 'updated_at',
-      key: 'updated_at',
-      render: (date: string) => dayjs(date).format('YYYY-MM-DD HH:mm'),
-      sorter: (a, b) => dayjs(a.updated_at).unix() - dayjs(b.updated_at).unix(),
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      align: 'center',
-      render: (_: any, record: Warehouse) => (
-        <Space size="middle">
-          <Tooltip title="View Details"><Button type="text" icon={<EyeOutlined />} onClick={() => navigate(`/master-data/warehouses/${record.id}`)} /></Tooltip>
-          <Can module="masterData" action="edit">
-            <Tooltip title="Edit"><Button type="text" icon={<EditOutlined />} onClick={() => navigate(`/master-data/warehouses/${record.id}/edit`)} /></Tooltip>
-          </Can>
-        </Space>
-      ),
-    },
-  ], [navigate, branchesMap]);
-  
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => initialColumns.map(c => c!.key as string));
+    const [warehouses, setWarehouses] = useState<WarehouseViewData[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [totalCount, setTotalCount] = useState(0);
+    const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
+    const [sorter, setSorter] = useState<SorterResult<WarehouseViewData> | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [warehouseData, branchData] = await Promise.all([
-          warehouseAPI.list(),
-          branchAPI.list()
-        ]);
-        
-        setAllWarehouses(warehouseData || []);
-        setBranches(branchData || []);
-      } catch (error: any) {
-        notification.error({ message: 'Error fetching data', description: error.message });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [notification]);
+    const [advancedFilters, setAdvancedFilters] = useState<any>({});
+    const [filterPopoverVisible, setFilterPopoverVisible] = useState(false);
+    const [columnPopoverVisible, setColumnPopoverVisible] = useState(false);
+    const [branches, setBranches] = useState<BranchFilterData[]>([]);
 
-  useEffect(() => {
-    let filtered = [...allWarehouses];
-    if (debouncedSearchTerm) {
-      const lowercasedFilter = debouncedSearchTerm.toLowerCase();
-      filtered = filtered.filter(item =>
-        item.code.toLowerCase().includes(lowercasedFilter) ||
-        item.name.toLowerCase().includes(lowercasedFilter) ||
-        (item.manager_name && item.manager_name.toLowerCase().includes(lowercasedFilter))
-      );
-    }
-    if (statusFilter !== null) {
-        filtered = filtered.filter(item => item.is_active === statusFilter);
-    }
-    if (branchFilter.length > 0) {
-        filtered = filtered.filter(item => branchFilter.includes(item.branch_id));
-    }
-    setFilteredWarehouses(filtered);
-  }, [debouncedSearchTerm, statusFilter, branchFilter, allWarehouses]);
+    const defaultColumns = ['code', 'name', 'is_active', 'branch_name', 'created_at', 'created_by_name', 'actions'];
+    const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns);
 
-  const columnSelector = (
-    <Dropdown
-      overlay={
-        <Menu>
-          <Checkbox.Group
-            className="flex flex-col p-2 bg-white rounded shadow-lg"
-            options={initialColumns.filter(c => c.key !== 'actions').map(({ key, title }) => ({ label: title as string, value: key as string }))}
-            value={visibleColumns}
-            onChange={(values) => setVisibleColumns(['actions', ...values as string[]])}
-          />
-        </Menu>
-      }
-      trigger={['click']}
-    >
-      <Button icon={<EyeOutlined />}>Columns</Button>
-    </Dropdown>
-  );
+    // Fetch branches for the filter dropdown
+    useEffect(() => {
+        const fetchBranches = async () => {
+            const { data, error } = await supabase.from('branches').select('id, name').order('name');
+            if (error) {
+                notification.error({ message: 'Error fetching branches', description: error.message });
+            } else {
+                setBranches(data);
+            }
+        };
+        fetchBranches();
+    }, [notification]);
 
-  const visibleTableColumns = useMemo(
-      () => initialColumns.filter(c => visibleColumns.includes(c!.key as string)),
-      [initialColumns, visibleColumns]
-  );
+    const fetchWarehouses = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { current, pageSize } = pagination;
+            const params = {
+                p_page_number: current,
+                p_page_size: pageSize,
+                p_search_text: debouncedSearchTerm || null,
+                p_sort_by: sorter?.field as string || 'created_at',
+                p_sort_order: sorter?.order === 'ascend' ? 'asc' : 'desc',
+                p_branch_id: advancedFilters.branch_id,
+                p_status: advancedFilters.status,
+                p_date_range: advancedFilters.date_range ? { 
+                    start: dayjs(advancedFilters.date_range[0]).startOf('day').toISOString(), 
+                    end: dayjs(advancedFilters.date_range[1]).endOf('day').toISOString()
+                } : null,
+            };
 
-  return (
-    <Card
-        title="Warehouses"
-        extra={
-            <Space>
-                {columnSelector}
-                <Button icon={<FileExcelOutlined />}>Export</Button>
-                <Can module="masterData" action="create">
-                  <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/warehouses/create')}>
-                      Create
-                  </Button>
-                </Can>
-            </Space>
+            const { data, error } = await supabase.rpc('get_warehouses_list', params);
+
+            if (error) throw error;
+            
+            const result = data as { data: WarehouseViewData[], total_count: number };
+            setWarehouses(result.data || []);
+            setTotalCount(result.total_count || 0);
+
+        } catch (error: any) {
+            notification.error({
+                message: 'Error fetching warehouses',
+                description: `RPC Error: ${error.message}. Ensure the 'get_warehouses_list' function exists and accepts all required parameters.`,
+            });
+        } finally {
+            setLoading(false);
         }
-    >
-        <Row gutter={[16, 16]} className="mb-4">
-            <Col xs={24} sm={12} md={8}>
-                <Input.Search 
-                    placeholder="Search by code, name, manager..." 
-                    onSearch={setSearchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    allowClear
+    }, [pagination, sorter, debouncedSearchTerm, advancedFilters, notification]);
+
+    useEffect(() => {
+        fetchWarehouses();
+    }, [fetchWarehouses]);
+
+    const handleTableChange = (
+        pagination: TablePaginationConfig, 
+        filters: any, 
+        sorter: SorterResult<WarehouseViewData> | SorterResult<WarehouseViewData>[]
+    ) => {
+        setPagination(prev => ({ ...prev, current: pagination.current || 1 }));
+        const currentSorter = Array.isArray(sorter) ? sorter[0] : sorter;
+        setSorter(currentSorter.field && currentSorter.order ? currentSorter : null);
+    };
+
+    const handleFilterFinish = (values: any) => {
+        setAdvancedFilters(values);
+        setFilterPopoverVisible(false);
+    };
+
+    const handleFilterReset = () => {
+        form.resetFields();
+        setAdvancedFilters({});
+        setFilterPopoverVisible(false);
+    };
+
+    const allColumns = useMemo(() => [
+        { title: 'Mã Kho', dataIndex: 'code', key: 'code', sorter: true },
+        { 
+          title: 'Tên Kho',
+          dataIndex: 'name',
+          key: 'name',
+          sorter: true,
+          render: (text: string, record: WarehouseViewData) => <Link to={`/master-data/warehouses/${record.id}`}>{text}</Link>
+        },
+        { title: 'Trạng thái', dataIndex: 'is_active', key: 'is_active', sorter: true, render: (isActive: boolean) => <StatusTag status={isActive} /> },
+        { title: 'Chi nhánh', dataIndex: 'branch_name', key: 'branch_name', sorter: true },
+        { title: 'Địa chỉ', dataIndex: 'address', key: 'address' },
+        { title: 'Ngày tạo', dataIndex: 'created_at', key: 'created_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
+        { title: 'Người tạo', dataIndex: 'created_by_name', key: 'created_by_name' },
+        { title: 'Ngày cập nhật', dataIndex: 'updated_at', key: 'updated_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY HH:mm') : '-' },
+        { title: 'Người cập nhật', dataIndex: 'updated_by_name', key: 'updated_by_name' },
+        {
+            title: 'Hành động',
+            key: 'actions',
+            align: 'center' as const,
+            fixed: 'right' as const,
+            width: 100,
+            render: (_: any, record: WarehouseViewData) => (
+                <Space size="small">
+                     <Tooltip title="Xem chi tiết">
+                        <button className="table-action-button" onClick={() => navigate(`/master-data/warehouses/${record.id}`)}>
+                            <EyeOutlined />
+                        </button>
+                    </Tooltip>
+                    <Can module="masterData" action="edit">
+                        <Tooltip title="Chỉnh sửa">
+                            <button className="table-action-button" onClick={() => navigate(`/master-data/warehouses/${record.id}/edit`)}>
+                                <EditOutlined />
+                            </button>
+                        </Tooltip>
+                    </Can>
+                </Space>
+            ),
+        },
+    ], [navigate]);
+
+    const columnToggler = (
+        <div style={{ padding: 8, width: 200 }}>
+            <Typography.Title level={5}>Tùy chỉnh cột</Typography.Title>
+            <Checkbox.Group
+                className="flex flex-col space-y-2"
+                options={allColumns.filter(c => c.key !== 'actions').map(c => ({ label: c.title, value: c.key as string }))}
+                value={visibleColumns}
+                onChange={(checkedValues) => setVisibleColumns([...checkedValues, 'actions'])}
+            />
+        </div>
+    );
+    
+    const advancedFilterForm = (
+        <div style={{ padding: 16, width: 350 }}>
+            <Typography.Title level={5}>Bộ lọc nâng cao</Typography.Title>
+            <Form form={form} layout="vertical" onFinish={handleFilterFinish}>
+                <Form.Item name="branch_id" label="Chi nhánh">
+                    <Select
+                        showSearch
+                        placeholder="Chọn chi nhánh"
+                        optionFilterProp="children"
+                        filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                        options={branches.map(b => ({ value: b.id, label: b.name }))}
+                        allowClear
+                    />
+                </Form.Item>
+                <Form.Item name="status" label="Trạng thái">
+                    <Select placeholder="Chọn trạng thái" allowClear>
+                        <Select.Option value={true}>Active</Select.Option>
+                        <Select.Option value={false}>Inactive</Select.Option>
+                    </Select>
+                </Form.Item>
+                 <Form.Item name="date_range" label="Khoảng ngày tạo">
+                    <RangePicker style={{ width: '100%' }} />
+                </Form.Item>
+                <Space>
+                    <Button onClick={handleFilterReset}>Đặt lại</Button>
+                    <Button type="primary" htmlType="submit">Xác nhận</Button>
+                </Space>
+            </Form>
+        </div>
+    );
+
+    return (
+        <Card>
+            <div className="flex justify-between items-center mb-6">
+                <Typography.Title level={4} style={{ margin: 0 }}>Warehouses</Typography.Title>
+                <Can module="masterData" action="create">
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/warehouses/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
+                        Thêm mới Kho
+                    </Button>
+                </Can>
+            </div>
+            <div className="flex justify-between items-center mb-4">
+                <Space>
+                    <Popover content={columnToggler} trigger="click" placement="bottomLeft" visible={columnPopoverVisible} onVisibleChange={setColumnPopoverVisible}>
+                        <Button icon={<SettingOutlined />} />
+                    </Popover>
+                    <Popover content={advancedFilterForm} trigger="click" placement="bottomLeft" visible={filterPopoverVisible} onVisibleChange={setFilterPopoverVisible}>
+                        <Button icon={<FilterOutlined />} />
+                    </Popover>
+                    <Input
+                        placeholder="Tìm kiếm theo Mã, Tên..."
+                        prefix={<SearchOutlined />}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        style={{ width: 250 }}
+                        allowClear
+                    />
+                </Space>
+            </div>
+
+            <div className="modern-table-container">
+                <Table
+                    rowKey="id"
+                    columns={allColumns.filter(c => visibleColumns.includes(c.key as string))}
+                    dataSource={warehouses}
+                    loading={loading}
+                    pagination={false}
+                    onChange={handleTableChange}
+                    scroll={{ x: 'max-content' }}
+                    className="custom-scrollbar"
                 />
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-                <Select
-                    allowClear
-                    style={{ width: '100%' }}
-                    placeholder="Filter by status..."
-                    onChange={(value) => setStatusFilter(value === undefined ? null : value)}
-                    options={[
-                        { label: 'Active', value: true },
-                        { label: 'Inactive', value: false },
-                    ]}
-                />
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-                <Select
-                    mode="multiple"
-                    allowClear
-                    style={{ width: '100%' }}
-                    placeholder="Filter by Branch..."
-                    onChange={setBranchFilter}
-                    options={branches.map(b => ({ label: b.name, value: b.id }))}
-                    maxTagCount="responsive"
-                />
-            </Col>
-        </Row>
-        <Spin spinning={loading}>
-          <Table
-            dataSource={filteredWarehouses}
-            columns={visibleTableColumns}
-            rowKey="id"
-            size="small"
-            bordered
-            scroll={{ x: 'max-content' }}
-            pagination={{ 
-                defaultPageSize: 10, 
-                showSizeChanger: true, 
-                pageSizeOptions: ['10', '20', '50'],
-                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`
-            }}
-          />
-        </Spin>
-    </Card>
-  );
+                 <div className="table-footer">
+                    <div>
+                        {totalCount > 0 && <Typography.Text>Tổng: {totalCount}</Typography.Text>}
+                    </div>
+                    <Pagination
+                        current={pagination.current}
+                        pageSize={pagination.pageSize}
+                        total={totalCount}
+                        showSizeChanger
+                        onChange={(page, pageSize) => setPagination({ current: page, pageSize })}
+                        onShowSizeChange={(_, size) => setPagination({ current: 1, pageSize: size })}
+                        pageSizeOptions={['10', '20', '50']}
+                    />
+                </div>
+            </div>
+        </Card>
+    );
 };
 
 const WarehousesListPageWrapper: React.FC = () => (
-    <App><WarehousesListPage /></App>
+    <App>
+        <WarehousesListPage />
+    </App>
 );
 
 export default WarehousesListPageWrapper;

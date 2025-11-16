@@ -1,7 +1,7 @@
+
 import React from 'react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
-import Breadcrumb from './Breadcrumb';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -11,8 +11,8 @@ interface AppLayoutProps {
 const Footer: React.FC = () => {
     return (
         <footer className="text-sm text-gray-500 flex justify-between items-center px-6 py-4 bg-white border-t border-gray-200">
-            <span>2025 © nguyenmanhtri2907@gmail.com</span>
-            <span>Design & Develop by Tri Nguyen</span>
+            <span>Copyright © 2025 Inventory XCloud</span>
+            <span>Design &amp; Develop by Tri Nguyen</span>
         </footer>
     );
 };
@@ -23,9 +23,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onLogout }) => {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar onLogout={onLogout} />
-        <div className="flex-1 flex flex-col overflow-y-auto bg-white">
-            <main className="flex-1 p-6">
-              <Breadcrumb />
+        <div className="flex-1 overflow-y-auto bg-[#F3F3F9]">
+            <main className="p-6">
               {children}
             </main>
             <Footer />

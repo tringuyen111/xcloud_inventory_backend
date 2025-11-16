@@ -1,13 +1,17 @@
 
+
+
+
 import React from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Breadcrumb as AntBreadcrumb } from 'antd';
-import { HomeOutlined } from '@ant-design/icons';
 
 const pathNameMapping: { [key: string]: string } = {
   dashboard: 'Dashboard',
+  profile: 'My Profile',
   onhand: 'Onhand',
   operations: 'Operations',
+  product: 'Product',
   gr: 'Goods Receipt',
   gi: 'Goods Issue',
   ic: 'Inventory Count',
@@ -25,59 +29,43 @@ const pathNameMapping: { [key: string]: string } = {
   'goods-models': 'Goods Models',
   reports: 'Reports',
   settings: 'Settings',
+  users: 'User Management',
+  roles: 'Roles Management',
+  permissions: 'Assign Permissions',
+  'lots-serials': 'Lots & Serials',
   dev: 'Developer',
   'db-schema': 'DB Schema',
   'supabase-mcp': 'Supabase MCP',
-  create: 'Create',
-  edit: 'Edit'
 };
-
-const nonLinkablePaths = ['operations', 'master-data', 'dev'];
 
 const Breadcrumb: React.FC = () => {
   const location = useLocation();
   const pathSnippets = location.pathname.split('/').filter(i => i);
 
-  const breadcrumbItems = pathSnippets.map((snippet, index) => {
-    const url = `/${pathSnippets.slice(0, index + 1).join('/')}`;
-    const isLast = index === pathSnippets.length - 1;
-    const name = pathNameMapping[snippet] || snippet.charAt(0).toUpperCase() + snippet.slice(1);
-    const isNonLinkable = nonLinkablePaths.includes(snippet);
+  const breadcrumbItems = pathSnippets
+    .map(snippet => {
+      // Exclude dynamic IDs and specific action words from the breadcrumb trail.
+      // The page title should contain the specific detail (e.g., "Editing Organization #123").
+      if (!isNaN(Number(snippet)) || snippet === 'create' || snippet === 'edit') {
+        return null;
+      }
 
-    if (!isNaN(Number(snippet))) {
-      const prevSnippet = pathSnippets[index-1];
-      const prevName = pathNameMapping[prevSnippet] || prevSnippet;
-      // Show "Detail" for numeric IDs
+      const name = pathNameMapping[snippet] || snippet.charAt(0).toUpperCase() + snippet.slice(1);
       return (
-        <AntBreadcrumb.Item key={url}>
-          <span>{prevName} Detail</span>
+        <AntBreadcrumb.Item key={snippet}>
+          <span>{name}</span>
         </AntBreadcrumb.Item>
       );
-    }
+    })
+    .filter(Boolean); // Remove any null entries
 
-    // Don't show create/edit in breadcrumbs as it's part of the page title
-    if (snippet === 'create' || snippet === 'edit') return null;
-
-    return (
-      <AntBreadcrumb.Item key={url}>
-        {isLast || isNonLinkable ? (
-          <span>{name}</span>
-        ) : (
-          <Link to={url}>{name}</Link>
-        )}
-      </AntBreadcrumb.Item>
-    );
-  }).filter(Boolean);
-
-  if (location.pathname === '/' || location.pathname === '/dashboard') {
+  // Don't render anything on the dashboard or if there are no valid breadcrumb items.
+  if (breadcrumbItems.length === 0 || location.pathname === '/dashboard') {
     return null;
   }
 
   return (
-    <AntBreadcrumb style={{ marginBottom: '24px' }}>
-      <AntBreadcrumb.Item>
-        <Link to="/dashboard"><HomeOutlined /></Link>
-      </AntBreadcrumb.Item>
+    <AntBreadcrumb separator="›">
       {breadcrumbItems}
     </AntBreadcrumb>
   );

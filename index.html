@@ -29,6 +29,43 @@
       .custom-scrollbar::-webkit-scrollbar-thumb:hover {
         background-color: #6b7280; /* gray-500 */
       }
+      
+      /* Custom Table Styles for new UI */
+      .modern-table-container .ant-table-thead > tr > th {
+        background-color: #f8f9fa !important; /* Light grey background */
+        font-weight: 600;
+        color: #495057;
+      }
+      .modern-table-container .ant-table-tbody > tr > td {
+        border-bottom: none !important; /* No row borders */
+      }
+      .modern-table-container .ant-table-tbody > tr.ant-table-row:hover > td {
+        background: #f1f3f5 !important; /* Subtle hover effect */
+      }
+      .modern-table-container .ant-pagination {
+        margin-top: 0;
+        padding: 0;
+      }
+      .modern-table-container .table-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 24px;
+        background: #fff;
+        border-top: 1px solid #f0f0f0;
+      }
+       .table-action-button {
+        background: none;
+        border: none;
+        padding: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        color: #888;
+      }
+      .table-action-button:hover {
+        color: #5664d2;
+      }
+
     </style>
   <script type="importmap">
 {
@@ -49,8 +86,8 @@
     "dayjs/": "https://esm.sh/dayjs@1.11.10/",
     "@mui/material/": "https://aistudiocdn.com/@mui/material@^7.3.5/",
     "antd/": "https://aistudiocdn.com/antd@^5.28.0/",
-    "@mui/material": "https://aistudiocdn.com/@mui/material@^7.3.5",
-    "@mui/icons-material": "https://aistudiocdn.com/@mui/icons-material@^7.3.5"
+    "@mui/material": "https://aistudiocdn.com/mui-material@^7.3.5",
+    "@mui/icons-material": "https://aistudiocdn.com/mui-icons-material@^7.3.5"
   }
 }
 </script>

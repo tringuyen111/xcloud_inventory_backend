@@ -1,179 +1,315 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, Dropdown, Menu, Checkbox } from 'antd';
-import { EyeOutlined, PlusOutlined, FileExcelOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import {
+    App,
+    Button,
+    Card,
+    Input,
+    Table,
+    Space,
+    Typography,
+    Pagination,
+    Tooltip,
+    Popover,
+    Checkbox,
+    Form,
+    Select,
+    DatePicker,
+    Tag,
+} from 'antd';
+import {
+    PlusOutlined,
+    SearchOutlined,
+    EditOutlined,
+    EyeOutlined,
+    FilterOutlined,
+    SettingOutlined,
+} from '@ant-design/icons';
+import { supabase } from '../../../lib/supabase';
 import { useDebounce } from '../../../hooks/useDebounce';
-import { putawayAPI, warehouseAPI, goodsReceiptAPI } from '../../../utils/apiClient';
+import Can from '../../../components/auth/Can';
+import dayjs from 'dayjs';
+import { TablePaginationConfig } from 'antd/lib/table';
+import { SorterResult } from 'antd/lib/table/interface';
 import { Database } from '../../../types/supabase';
 
-type PutawayHeader = Database['transactions']['Tables']['putaway_header']['Row'];
-type Warehouse = Database['master']['Tables']['warehouses']['Row'];
-type GoodsReceipt = Database['transactions']['Tables']['gr_header']['Row'];
+const { RangePicker } = DatePicker;
 
-type PutawayWithData = PutawayHeader & {
-  warehouseName?: string;
-  grCode?: string;
+// --- Types ---
+type PutawayViewData = {
+  id: number;
+  code: string;
+  status: Database['public']['Enums']['doc_status_enum'];
+  warehouse_name: string;
+  gr_code: string | null;
+  putaway_date: string | null;
+  created_at: string;
+  created_by_name: string | null;
+  updated_at: string;
+  updated_by_name: string | null;
 };
 
-// FIX: Replaced 'IN_PROGRESS' with 'MOVING' to match the valid enum values from the Supabase schema.
-const PUTAWAY_STATUSES: PutawayHeader['status'][] = ['DRAFT', 'MOVING', 'COMPLETED', 'CANCELLED'];
-
-const getStatusColor = (status: PutawayHeader['status']) => {
-  switch (status) {
-    case 'DRAFT': return 'default';
-    // FIX: Replaced 'IN_PROGRESS' with 'MOVING' to match the valid enum values from the Supabase schema.
-    case 'MOVING': return 'processing';
-    case 'COMPLETED': return 'success';
-    case 'CANCELLED': return 'error';
-    default: return 'default';
-  }
+type FilterData = {
+    id: number;
+    name: string;
 };
 
-const PutawayListPage: React.FC = () => {
-  const [putaways, setPutaways] = useState<PutawayWithData[]>([]);
-  const [filteredPutaways, setFilteredPutaways] = useState<PutawayWithData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const navigate = useNavigate();
-  const { notification } = App.useApp();
+const DOC_STATUSES: Database['public']['Enums']['doc_status_enum'][] = ['DRAFT', 'CREATED', 'IN_PROGRESS', 'WAITING_APPROVAL', 'APPROVED', 'COMPLETED', 'CANCELLED'];
 
-  const columns = useMemo(() => [
-    { title: 'Document No', dataIndex: 'code', key: 'code' },
-    { title: 'GR No', dataIndex: 'grCode', key: 'grCode', render: (code?: string) => code || 'N/A' },
-    { title: 'Warehouse', dataIndex: 'warehouseName', key: 'warehouseName', render: (name?: string) => name || 'N/A' },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: PutawayHeader['status']) => <Tag color={getStatusColor(status)}>{status}</Tag>,
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_: any, record: PutawayHeader) => (
-        <Space size="middle">
-          <Tooltip title="View Details">
-            <Button icon={<EyeOutlined />} onClick={() => navigate(`/operations/pa/${record.id}`)} />
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ], [navigate]);
-
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => columns.map(c => c.key as string));
-
-  useEffect(() => {
-    const fetchPutaways = async () => {
-      setLoading(true);
-      try {
-        const [putawayData, warehouseData, grData] = await Promise.all([
-          putawayAPI.list(),
-          warehouseAPI.list(),
-          goodsReceiptAPI.list()
-        ]);
-
-        const warehouseMap = new Map(warehouseData.map(w => [w.id, w.name]));
-        const grMap = new Map(grData.map(gr => [gr.id, gr.code]));
-
-        const enrichedData = putawayData.map(p => ({
-          ...p,
-          warehouseName: warehouseMap.get(p.warehouse_id),
-          grCode: p.gr_header_id ? grMap.get(p.gr_header_id) : undefined,
-        }));
-        
-        setPutaways(enrichedData);
-      } catch (error: any) {
-        notification.error({ message: 'Error fetching putaway tasks', description: error.message });
-      } finally {
-        setLoading(false);
-      }
+// --- Shared Components ---
+const statusTag = (status: Database['public']['Enums']['doc_status_enum']) => {
+    const colorMap: Record<Database['public']['Enums']['doc_status_enum'], string> = {
+        DRAFT: 'default',
+        CREATED: 'cyan',
+        IN_PROGRESS: 'processing',
+        WAITING_APPROVAL: 'warning',
+        APPROVED: 'purple',
+        COMPLETED: 'success',
+        CANCELLED: 'error',
     };
-    fetchPutaways();
-  }, [notification]);
+    return <Tag color={colorMap[status] || 'default'}>{status}</Tag>;
+};
 
-  useEffect(() => {
-    let filtered = [...putaways];
-    if (debouncedSearchTerm) {
-      filtered = filtered.filter(item =>
-        item.code.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-        item.grCode?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
-      );
-    }
-    if (statusFilter.length > 0) {
-        filtered = filtered.filter(item => statusFilter.includes(item.status));
-    }
-    setFilteredPutaways(filtered);
-  }, [debouncedSearchTerm, statusFilter, putaways]);
+// --- Main Page Component ---
+const PutawayListPage: React.FC = () => {
+    const navigate = useNavigate();
+    const { notification } = App.useApp();
+    const [form] = Form.useForm();
 
-  const columnSelector = (
-    <Dropdown
-      overlay={
-        <Menu>
-          <Checkbox.Group
-            className="flex flex-col p-2"
-            options={columns.map(({ key, title }) => ({ label: title as string, value: key as string }))}
-            value={visibleColumns}
-            onChange={(values) => setVisibleColumns(values as string[])}
-          />
-        </Menu>
-      }
-      trigger={['click']}
-    >
-      <Button icon={<EyeOutlined />}>Columns</Button>
-    </Dropdown>
-  );
+    const [putaways, setPutaways] = useState<PutawayViewData[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [totalCount, setTotalCount] = useState(0);
+    const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
+    const [sorter, setSorter] = useState<SorterResult<PutawayViewData> | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  return (
-    <Card
-      title="Putaway"
-      extra={
-        <Space>
-          {columnSelector}
-          <Button icon={<FileExcelOutlined />}>Export</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/pa/create')}>
-            Create
-          </Button>
-        </Space>
-      }
-    >
-      <Row gutter={[16, 16]} className="mb-4">
-        <Col xs={24} sm={12} md={8}>
-          <Input.Search 
-            placeholder="Search by document or GR no..." 
-            onSearch={setSearchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            allowClear
-          />
-        </Col>
-        <Col xs={24} sm={12} md={8}>
-            <Select
-                mode="multiple"
-                allowClear
-                style={{ width: '100%' }}
-                placeholder="Filter by status..."
-                onChange={setStatusFilter}
-                options={PUTAWAY_STATUSES.map(status => ({ label: status, value: status }))}
+    const [advancedFilters, setAdvancedFilters] = useState<any>({});
+    const [filterPopoverVisible, setFilterPopoverVisible] = useState(false);
+    const [columnPopoverVisible, setColumnPopoverVisible] = useState(false);
+    
+    const [warehouses, setWarehouses] = useState<FilterData[]>([]);
+
+    const defaultColumns = ['code', 'status', 'warehouse_name', 'gr_code', 'putaway_date', 'created_at', 'created_by_name', 'actions'];
+    const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns);
+
+    // Fetch data for filters
+    useEffect(() => {
+        const fetchFilterData = async () => {
+            const { data, error } = await supabase.from('warehouses').select('id, name').order('name');
+            if (error) notification.error({ message: 'Lỗi tải danh sách kho', description: error.message });
+            else setWarehouses(data);
+        };
+        fetchFilterData();
+    }, [notification]);
+
+    const fetchPutaways = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { current, pageSize } = pagination;
+            const params = {
+                p_page_number: current,
+                p_page_size: pageSize,
+                p_search_text: debouncedSearchTerm || null,
+                p_sort_by: sorter?.field as string || 'created_at',
+                p_sort_order: sorter?.order === 'ascend' ? 'asc' : 'desc',
+                p_warehouse_id: advancedFilters.warehouse_id,
+                p_status: advancedFilters.status,
+                p_date_range: advancedFilters.putaway_date_range ? { 
+                    start: dayjs(advancedFilters.putaway_date_range[0]).startOf('day').toISOString(), 
+                    end: dayjs(advancedFilters.putaway_date_range[1]).endOf('day').toISOString()
+                } : null,
+            };
+
+            const { data, error } = await supabase.rpc('get_putaways_list', params);
+
+            if (error) throw error;
+            
+            const result = data as { data: PutawayViewData[], total_count: number };
+            setPutaways(result.data || []);
+            setTotalCount(result.total_count || 0);
+
+        } catch (error: any) {
+            notification.error({
+                message: 'Lỗi tải danh sách phiếu chuyển vị',
+                description: `RPC Error: ${error.message}.`,
+            });
+        } finally {
+            setLoading(false);
+        }
+    }, [pagination, sorter, debouncedSearchTerm, advancedFilters, notification]);
+
+    useEffect(() => {
+        fetchPutaways();
+    }, [fetchPutaways]);
+
+    const handleTableChange = (
+        newPagination: TablePaginationConfig, 
+        filters: any, 
+        newSorter: SorterResult<PutawayViewData> | SorterResult<PutawayViewData>[]
+    ) => {
+        setPagination(prev => ({ ...prev, current: newPagination.current || 1 }));
+        const currentSorter = Array.isArray(newSorter) ? newSorter[0] : newSorter;
+        setSorter(currentSorter.field && currentSorter.order ? currentSorter : null);
+    };
+
+    const handleFilterFinish = (values: any) => {
+        setAdvancedFilters(values);
+        setFilterPopoverVisible(false);
+    };
+
+    const handleFilterReset = () => {
+        form.resetFields();
+        setAdvancedFilters({});
+        setFilterPopoverVisible(false);
+    };
+
+    const allColumns = useMemo(() => [
+        { 
+            title: 'Mã Phiếu',
+            dataIndex: 'code',
+            key: 'code',
+            sorter: true,
+            render: (text: string, record: PutawayViewData) => <Link to={`/operations/pa/${record.id}`}>{text}</Link>
+        },
+        { title: 'Trạng thái', dataIndex: 'status', key: 'status', sorter: true, render: statusTag },
+        { title: 'Kho', dataIndex: 'warehouse_name', key: 'warehouse_name', sorter: true },
+        { title: 'Mã GR gốc', dataIndex: 'gr_code', key: 'gr_code', sorter: true, render: (text: string) => text || 'N/A' },
+        { title: 'Ngày chuyển vị', dataIndex: 'putaway_date', key: 'putaway_date', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
+        { title: 'Ngày tạo', dataIndex: 'created_at', key: 'created_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
+        { title: 'Người tạo', dataIndex: 'created_by_name', key: 'created_by_name', render: (text: string) => text || 'N/A' },
+        { title: 'Ngày cập nhật', dataIndex: 'updated_at', key: 'updated_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY HH:mm') : '-' },
+        { title: 'Người cập nhật', dataIndex: 'updated_by_name', key: 'updated_by_name', render: (text: string) => text || 'N/A' },
+        {
+            title: 'Hành động',
+            key: 'actions',
+            align: 'center' as const,
+            fixed: 'right' as const,
+            width: 100,
+            render: (_: any, record: PutawayViewData) => (
+                <Space size="small">
+                    <Tooltip title="Xem chi tiết">
+                        <button className="table-action-button" onClick={() => navigate(`/operations/pa/${record.id}`)}>
+                            <EyeOutlined />
+                        </button>
+                    </Tooltip>
+                    {record.status === 'DRAFT' && (
+                        <Can module="operations" action="execute">
+                            <Tooltip title="Chỉnh sửa">
+                                <button className="table-action-button" onClick={() => navigate(`/operations/pa/${record.id}/edit`)}>
+                                    <EditOutlined />
+                                </button>
+                            </Tooltip>
+                        </Can>
+                    )}
+                </Space>
+            ),
+        },
+    ], [navigate]);
+
+    const columnToggler = (
+        <div style={{ padding: 8, width: 200 }}>
+            <Typography.Title level={5}>Tùy chỉnh cột</Typography.Title>
+            <Checkbox.Group
+                className="flex flex-col space-y-2"
+                options={allColumns.filter(c => c.key !== 'actions').map(c => ({ label: c.title, value: c.key as string }))}
+                value={visibleColumns}
+                onChange={(checkedValues) => setVisibleColumns([...checkedValues, 'actions'])}
             />
-        </Col>
-      </Row>
-      <Spin spinning={loading}>
-        <Table 
-            dataSource={filteredPutaways} 
-            columns={columns.filter(c => visibleColumns.includes(c.key as string))} 
-            rowKey="id" 
-            size="small" 
-            bordered 
-            pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '20', '50'] }}
-        />
-      </Spin>
-    </Card>
-  );
+        </div>
+    );
+    
+    const advancedFilterForm = (
+        <div style={{ padding: 16, width: 350 }}>
+            <Typography.Title level={5}>Bộ lọc nâng cao</Typography.Title>
+            <Form form={form} layout="vertical" onFinish={handleFilterFinish}>
+                <Form.Item name="warehouse_id" label="Kho">
+                    <Select
+                        showSearch placeholder="Chọn kho" optionFilterProp="children"
+                        filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                        options={warehouses.map(wh => ({ value: wh.id, label: wh.name }))} allowClear
+                    />
+                </Form.Item>
+                <Form.Item name="status" label="Trạng thái">
+                    <Select placeholder="Chọn trạng thái" mode="multiple" allowClear>
+                        {DOC_STATUSES.map(status => <Select.Option key={status} value={status}>{status}</Select.Option>)}
+                    </Select>
+                </Form.Item>
+                <Form.Item name="putaway_date_range" label="Khoảng ngày chuyển vị">
+                    <RangePicker style={{ width: '100%' }} />
+                </Form.Item>
+                <Space>
+                    <Button onClick={handleFilterReset}>Đặt lại</Button>
+                    <Button type="primary" htmlType="submit">Xác nhận</Button>
+                </Space>
+            </Form>
+        </div>
+    );
+
+    return (
+        <Card>
+            <div className="flex justify-between items-center mb-6">
+                <Typography.Title level={4} style={{ margin: 0 }}>Danh sách Phiếu chuyển vị</Typography.Title>
+                <Can module="operations" action="create">
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/pa/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
+                        Thêm mới Phiếu chuyển vị
+                    </Button>
+                </Can>
+            </div>
+            <div className="flex justify-between items-center mb-4">
+                <Space>
+                    <Popover content={columnToggler} trigger="click" placement="bottomLeft" visible={columnPopoverVisible} onVisibleChange={setColumnPopoverVisible}>
+                        <Button icon={<SettingOutlined />} aria-label="Tùy chỉnh cột" />
+                    </Popover>
+                    <Popover content={advancedFilterForm} trigger="click" placement="bottomLeft" visible={filterPopoverVisible} onVisibleChange={setFilterPopoverVisible}>
+                        <Button icon={<FilterOutlined />} aria-label="Bộ lọc nâng cao" />
+                    </Popover>
+                    <Input
+                        placeholder="Tìm kiếm theo Mã phiếu, Mã GR, Kho..."
+                        prefix={<SearchOutlined />}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        style={{ width: 300 }}
+                        allowClear
+                    />
+                </Space>
+            </div>
+
+            <div className="modern-table-container">
+                <Table
+                    rowKey="id"
+                    columns={allColumns.filter(c => visibleColumns.includes(c.key as string))}
+                    dataSource={putaways}
+                    loading={loading}
+                    pagination={false}
+                    onChange={handleTableChange}
+                    scroll={{ x: 'max-content' }}
+                    className="custom-scrollbar"
+                />
+                <div className="table-footer">
+                    <div>
+                        {totalCount > 0 && <Typography.Text>Tổng: {totalCount}</Typography.Text>}
+                    </div>
+                    <Pagination
+                        current={pagination.current}
+                        pageSize={pagination.pageSize}
+                        total={totalCount}
+                        showSizeChanger
+                        onChange={(page, pageSize) => setPagination({ current: page, pageSize })}
+                        onShowSizeChange={(_, size) => setPagination({ current: 1, pageSize: size })}
+                        pageSizeOptions={['10', '20', '50']}
+                    />
+                </div>
+            </div>
+        </Card>
+    );
 };
 
 const PutawayListPageWrapper: React.FC = () => (
-    <App><PutawayListPage /></App>
+    <App>
+        <PutawayListPage />
+    </App>
 );
 
 export default PutawayListPageWrapper;

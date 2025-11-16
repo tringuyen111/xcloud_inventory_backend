@@ -1,180 +1,315 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { App, Button, Card, Input, Space, Spin, Table, Tag, Tooltip, Row, Col, Select, DatePicker } from 'antd';
-import { EyeOutlined, PlusOutlined, FileExcelOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import {
+    App,
+    Button,
+    Card,
+    Input,
+    Table,
+    Space,
+    Typography,
+    Pagination,
+    Tooltip,
+    Popover,
+    Checkbox,
+    Form,
+    Select,
+    DatePicker,
+    Tag,
+} from 'antd';
+import {
+    PlusOutlined,
+    SearchOutlined,
+    EditOutlined,
+    EyeOutlined,
+    FilterOutlined,
+    SettingOutlined,
+} from '@ant-design/icons';
+import { supabase } from '../../../lib/supabase';
 import { useDebounce } from '../../../hooks/useDebounce';
+import Can from '../../../components/auth/Can';
 import dayjs from 'dayjs';
-import isBetween from 'dayjs/plugin/isBetween';
-import { inventoryCountAPI, warehouseAPI } from '../../../utils/apiClient';
+import { TablePaginationConfig } from 'antd/lib/table';
+import { SorterResult } from 'antd/lib/table/interface';
 import { Database } from '../../../types/supabase';
 
-dayjs.extend(isBetween);
 const { RangePicker } = DatePicker;
 
-type InventoryCount = Database['transactions']['Tables']['ic_header']['Row'];
-type Warehouse = Database['master']['Tables']['warehouses']['Row'];
-
-const IC_STATUSES: InventoryCount['status'][] = ['DRAFT', 'CREATED', 'COUNTING', 'COMPLETED', 'CANCELLED'];
-
-const getStatusColor = (status: InventoryCount['status']) => {
-  switch (status) {
-    case 'DRAFT': return 'default';
-    case 'CREATED': return 'processing';
-    case 'COUNTING': return 'blue';
-    case 'COMPLETED': return 'success';
-    case 'CANCELLED': return 'error';
-    default: return 'default';
-  }
+// --- Types ---
+type InventoryCountViewData = {
+  id: number;
+  code: string;
+  status: Database['public']['Enums']['doc_status_enum'];
+  warehouse_name: string;
+  count_date: string;
+  created_at: string;
+  created_by_name: string | null;
+  approved_by_name: string | null;
+  updated_at: string;
+  updated_by_name: string | null;
 };
 
-const ICListPage: React.FC = () => {
-  const [allIcList, setAllIcList] = useState<InventoryCount[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [warehouses, setWarehouses] = useState<Pick<Warehouse, 'id' | 'name'>[]>([]);
+type FilterData = {
+    id: number;
+    name: string;
+};
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [warehouseFilter, setWarehouseFilter] = useState<string[]>([]);
-  const [dateFilter, setDateFilter] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
+const DOC_STATUSES: Database['public']['Enums']['doc_status_enum'][] = ['DRAFT', 'CREATED', 'IN_PROGRESS', 'WAITING_APPROVAL', 'APPROVED', 'COMPLETED', 'CANCELLED'];
 
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const navigate = useNavigate();
-  const { notification } = App.useApp();
-  
-  const warehousesMap = useMemo(() => new Map(warehouses.map(w => [w.id, w.name])), [warehouses]);
-
-  const columns = useMemo(() => [
-    { title: 'IC Code', dataIndex: 'code', key: 'code', sorter: (a: InventoryCount, b: InventoryCount) => a.code.localeCompare(b.code) },
-    { 
-      title: 'Count Date', 
-      dataIndex: 'count_date', 
-      key: 'count_date',
-      render: (date: string) => date ? dayjs(date).format('YYYY-MM-DD') : 'N/A',
-      sorter: (a: InventoryCount, b: InventoryCount) => dayjs(a.count_date).unix() - dayjs(b.count_date).unix(),
-    },
-    { title: 'Warehouse', dataIndex: 'warehouse_id', key: 'warehouse_id', render: (id: string) => warehousesMap.get(id) || 'N/A' },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: InventoryCount['status']) => <Tag color={getStatusColor(status)}>{status}</Tag>,
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_: any, record: InventoryCount) => (
-        <Space size="middle">
-          <Tooltip title="View Details">
-            <Button icon={<EyeOutlined />} onClick={() => navigate(`/operations/ic/${record.id}`)} />
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ], [navigate, warehousesMap]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [icData, whData] = await Promise.all([
-          inventoryCountAPI.list(),
-          warehouseAPI.list(),
-        ]);
-
-        setAllIcList(icData || []);
-        setWarehouses(whData || []);
-      } catch (error: any) {
-        notification.error({ message: 'Error fetching data', description: error.message });
-      } finally {
-        setLoading(false);
-      }
+// --- Shared Components ---
+const statusTag = (status: Database['public']['Enums']['doc_status_enum']) => {
+    const colorMap: Record<Database['public']['Enums']['doc_status_enum'], string> = {
+        DRAFT: 'default',
+        CREATED: 'cyan',
+        IN_PROGRESS: 'processing',
+        WAITING_APPROVAL: 'warning',
+        APPROVED: 'purple',
+        COMPLETED: 'success',
+        CANCELLED: 'error',
     };
-    fetchData();
-  }, [notification]);
+    return <Tag color={colorMap[status] || 'default'}>{status}</Tag>;
+};
 
-  const filteredIcList = useMemo(() => {
-    let filtered = [...allIcList];
-    if (debouncedSearchTerm) {
-      filtered = filtered.filter(item =>
-        item.code.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
-      );
-    }
-    if (statusFilter.length > 0) {
-        filtered = filtered.filter(item => statusFilter.includes(item.status));
-    }
-    if (warehouseFilter.length > 0) {
-        filtered = filtered.filter(item => warehouseFilter.includes(item.warehouse_id));
-    }
-    if (dateFilter && dateFilter[0] && dateFilter[1]) {
-        const [start, end] = dateFilter;
-        filtered = filtered.filter(item => dayjs(item.count_date).isBetween(start, end, 'day', '[]'));
-    }
-    return filtered;
-  }, [debouncedSearchTerm, statusFilter, warehouseFilter, dateFilter, allIcList]);
-  
-  return (
-    <Card
-      title="Inventory Counts"
-      extra={
-        <Space>
-          <Button icon={<FileExcelOutlined />}>Export</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/ic/create')}>
-            Create
-          </Button>
-        </Space>
-      }
-    >
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={8}>
-            <Input.Search 
-              placeholder="Search by IC code..." 
-              onSearch={setSearchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              allowClear
+// --- Main Page Component ---
+const ICListPage: React.FC = () => {
+    const navigate = useNavigate();
+    const { notification } = App.useApp();
+    const [form] = Form.useForm();
+
+    const [inventoryCounts, setInventoryCounts] = useState<InventoryCountViewData[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [totalCount, setTotalCount] = useState(0);
+    const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
+    const [sorter, setSorter] = useState<SorterResult<InventoryCountViewData> | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
+    const [advancedFilters, setAdvancedFilters] = useState<any>({});
+    const [filterPopoverVisible, setFilterPopoverVisible] = useState(false);
+    const [columnPopoverVisible, setColumnPopoverVisible] = useState(false);
+    
+    const [warehouses, setWarehouses] = useState<FilterData[]>([]);
+
+    const defaultColumns = ['code', 'status', 'warehouse_name', 'count_date', 'created_at', 'created_by_name', 'actions'];
+    const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns);
+
+    // Fetch data for filters
+    useEffect(() => {
+        const fetchFilterData = async () => {
+            const { data, error } = await supabase.from('warehouses').select('id, name').order('name');
+            if (error) notification.error({ message: 'Lỗi tải danh sách kho', description: error.message });
+            else setWarehouses(data);
+        };
+        fetchFilterData();
+    }, [notification]);
+
+    const fetchInventoryCounts = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { current, pageSize } = pagination;
+            const params = {
+                p_page_number: current,
+                p_page_size: pageSize,
+                p_search_text: debouncedSearchTerm || null,
+                p_sort_by: sorter?.field as string || 'created_at',
+                p_sort_order: sorter?.order === 'ascend' ? 'asc' : 'desc',
+                p_warehouse_id: advancedFilters.warehouse_id,
+                p_status: advancedFilters.status,
+                p_date_range: advancedFilters.count_date_range ? { 
+                    start: dayjs(advancedFilters.count_date_range[0]).startOf('day').toISOString(), 
+                    end: dayjs(advancedFilters.count_date_range[1]).endOf('day').toISOString()
+                } : null,
+            };
+
+            const { data, error } = await supabase.rpc('get_inventory_counts_list', params);
+
+            if (error) throw error;
+            
+            const result = data as { data: InventoryCountViewData[], total_count: number };
+            setInventoryCounts(result.data || []);
+            setTotalCount(result.total_count || 0);
+
+        } catch (error: any) {
+            notification.error({
+                message: 'Lỗi tải danh sách phiếu kiểm kê',
+                description: `RPC Error: ${error.message}.`,
+            });
+        } finally {
+            setLoading(false);
+        }
+    }, [pagination, sorter, debouncedSearchTerm, advancedFilters, notification]);
+
+    useEffect(() => {
+        fetchInventoryCounts();
+    }, [fetchInventoryCounts]);
+
+    const handleTableChange = (
+        newPagination: TablePaginationConfig, 
+        filters: any, 
+        newSorter: SorterResult<InventoryCountViewData> | SorterResult<InventoryCountViewData>[]
+    ) => {
+        setPagination(prev => ({ ...prev, current: newPagination.current || 1 }));
+        const currentSorter = Array.isArray(newSorter) ? newSorter[0] : newSorter;
+        setSorter(currentSorter.field && currentSorter.order ? currentSorter : null);
+    };
+
+    const handleFilterFinish = (values: any) => {
+        setAdvancedFilters(values);
+        setFilterPopoverVisible(false);
+    };
+
+    const handleFilterReset = () => {
+        form.resetFields();
+        setAdvancedFilters({});
+        setFilterPopoverVisible(false);
+    };
+
+    const allColumns = useMemo(() => [
+        { 
+            title: 'Mã Phiếu kiểm kê',
+            dataIndex: 'code',
+            key: 'code',
+            sorter: true,
+            render: (text: string, record: InventoryCountViewData) => <Link to={`/operations/ic/${record.id}`}>{text}</Link>
+        },
+        { title: 'Trạng thái', dataIndex: 'status', key: 'status', sorter: true, render: statusTag },
+        { title: 'Kho', dataIndex: 'warehouse_name', key: 'warehouse_name', sorter: true },
+        { title: 'Ngày đếm', dataIndex: 'count_date', key: 'count_date', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
+        { title: 'Người duyệt', dataIndex: 'approved_by_name', key: 'approved_by_name', sorter: true, render: (text: string) => text || 'N/A' },
+        { title: 'Ngày tạo', dataIndex: 'created_at', key: 'created_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
+        { title: 'Người tạo', dataIndex: 'created_by_name', key: 'created_by_name', render: (text: string) => text || 'N/A' },
+        { title: 'Ngày cập nhật', dataIndex: 'updated_at', key: 'updated_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY HH:mm') : '-' },
+        { title: 'Người cập nhật', dataIndex: 'updated_by_name', key: 'updated_by_name', render: (text: string) => text || 'N/A' },
+        {
+            title: 'Hành động',
+            key: 'actions',
+            align: 'center' as const,
+            fixed: 'right' as const,
+            width: 100,
+            render: (_: any, record: InventoryCountViewData) => (
+                <Space size="small">
+                    <Tooltip title="Xem chi tiết">
+                        <button className="table-action-button" onClick={() => navigate(`/operations/ic/${record.id}`)}>
+                            <EyeOutlined />
+                        </button>
+                    </Tooltip>
+                    {record.status === 'DRAFT' && (
+                        <Can module="operations" action="execute">
+                            <Tooltip title="Chỉnh sửa">
+                                <button className="table-action-button" onClick={() => navigate(`/operations/ic/${record.id}/edit`)}>
+                                    <EditOutlined />
+                                </button>
+                            </Tooltip>
+                        </Can>
+                    )}
+                </Space>
+            ),
+        },
+    ], [navigate]);
+
+    const columnToggler = (
+        <div style={{ padding: 8, width: 200 }}>
+            <Typography.Title level={5}>Tùy chỉnh cột</Typography.Title>
+            <Checkbox.Group
+                className="flex flex-col space-y-2"
+                options={allColumns.filter(c => c.key !== 'actions').map(c => ({ label: c.title, value: c.key as string }))}
+                value={visibleColumns}
+                onChange={(checkedValues) => setVisibleColumns([...checkedValues, 'actions'])}
             />
-          </Col>
-          <Col xs={24} sm={12} md={8}>
-              <Select
-                  mode="multiple"
-                  allowClear
-                  style={{ width: '100%' }}
-                  placeholder="Filter by status..."
-                  onChange={setStatusFilter}
-                  options={IC_STATUSES.map(status => ({ label: status, value: status }))}
-              />
-          </Col>
-           <Col xs={24} sm={12} md={8}>
-            <RangePicker style={{ width: '100%' }} onChange={(dates) => setDateFilter(dates as any)} />
-          </Col>
-           <Col xs={24} sm={12} md={8}>
-              <Select
-                  mode="multiple"
-                  allowClear
-                  style={{ width: '100%' }}
-                  placeholder="Filter by warehouse..."
-                  onChange={setWarehouseFilter}
-                  options={warehouses.map(w => ({ label: w.name, value: w.id }))}
-              />
-          </Col>
-        </Row>
-        <Spin spinning={loading}>
-          <Table 
-              dataSource={filteredIcList} 
-              columns={columns} 
-              rowKey="id" 
-              size="small" 
-              bordered 
-              pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '20', '50'] }}
-          />
-        </Spin>
-      </Space>
-    </Card>
-  );
+        </div>
+    );
+    
+    const advancedFilterForm = (
+        <div style={{ padding: 16, width: 350 }}>
+            <Typography.Title level={5}>Bộ lọc nâng cao</Typography.Title>
+            <Form form={form} layout="vertical" onFinish={handleFilterFinish}>
+                <Form.Item name="warehouse_id" label="Kho">
+                    <Select
+                        showSearch placeholder="Chọn kho" optionFilterProp="children"
+                        filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                        options={warehouses.map(wh => ({ value: wh.id, label: wh.name }))} allowClear
+                    />
+                </Form.Item>
+                <Form.Item name="status" label="Trạng thái">
+                    <Select placeholder="Chọn trạng thái" mode="multiple" allowClear>
+                        {DOC_STATUSES.map(status => <Select.Option key={status} value={status}>{status}</Select.Option>)}
+                    </Select>
+                </Form.Item>
+                <Form.Item name="count_date_range" label="Khoảng ngày đếm">
+                    <RangePicker style={{ width: '100%' }} />
+                </Form.Item>
+                <Space>
+                    <Button onClick={handleFilterReset}>Đặt lại</Button>
+                    <Button type="primary" htmlType="submit">Xác nhận</Button>
+                </Space>
+            </Form>
+        </div>
+    );
+
+    return (
+        <Card>
+            <div className="flex justify-between items-center mb-6">
+                <Typography.Title level={4} style={{ margin: 0 }}>Danh sách Phiếu kiểm kê</Typography.Title>
+                <Can module="operations" action="create">
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/ic/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
+                        Thêm mới Phiếu kiểm kê
+                    </Button>
+                </Can>
+            </div>
+            <div className="flex justify-between items-center mb-4">
+                <Space>
+                    <Popover content={columnToggler} trigger="click" placement="bottomLeft" visible={columnPopoverVisible} onVisibleChange={setColumnPopoverVisible}>
+                        <Button icon={<SettingOutlined />} aria-label="Tùy chỉnh cột" />
+                    </Popover>
+                    <Popover content={advancedFilterForm} trigger="click" placement="bottomLeft" visible={filterPopoverVisible} onVisibleChange={setFilterPopoverVisible}>
+                        <Button icon={<FilterOutlined />} aria-label="Bộ lọc nâng cao" />
+                    </Popover>
+                    <Input
+                        placeholder="Tìm kiếm theo Mã phiếu, Kho..."
+                        prefix={<SearchOutlined />}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        style={{ width: 300 }}
+                        allowClear
+                    />
+                </Space>
+            </div>
+
+            <div className="modern-table-container">
+                <Table
+                    rowKey="id"
+                    columns={allColumns.filter(c => visibleColumns.includes(c.key as string))}
+                    dataSource={inventoryCounts}
+                    loading={loading}
+                    pagination={false}
+                    onChange={handleTableChange}
+                    scroll={{ x: 'max-content' }}
+                    className="custom-scrollbar"
+                />
+                <div className="table-footer">
+                    <div>
+                        {totalCount > 0 && <Typography.Text>Tổng: {totalCount}</Typography.Text>}
+                    </div>
+                    <Pagination
+                        current={pagination.current}
+                        pageSize={pagination.pageSize}
+                        total={totalCount}
+                        showSizeChanger
+                        onChange={(page, pageSize) => setPagination({ current: page, pageSize })}
+                        onShowSizeChange={(_, size) => setPagination({ current: 1, pageSize: size })}
+                        pageSizeOptions={['10', '20', '50']}
+                    />
+                </div>
+            </div>
+        </Card>
+    );
 };
 
 const ICListPageWrapper: React.FC = () => (
-    <App><ICListPage /></App>
+    <App>
+        <ICListPage />
+    </App>
 );
 
 export default ICListPageWrapper;
