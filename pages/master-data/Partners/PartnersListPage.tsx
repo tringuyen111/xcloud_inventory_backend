@@ -135,7 +135,10 @@ const PartnersListPage: React.FC = () => {
         setFilterPopoverVisible(false);
     };
 
-    const partnerTypeTag = (type: Database['public']['Enums']['partner_type_enum']) => {
+    const partnerTypeTag = (type: Database['public']['Enums']['partner_type_enum'] | null) => {
+        if (!type) {
+            return '—';
+        }
         const color = type === 'SUPPLIER' ? 'purple' : type === 'CUSTOMER' ? 'green' : 'gold';
         return <Tag color={color}>{type}</Tag>;
     }

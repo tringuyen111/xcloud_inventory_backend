@@ -8,8 +8,12 @@ declare var Deno: any;
 
 // Function to check if the calling user is an admin
 async function isAdmin(userSupabaseClient: SupabaseClient): Promise<boolean> {
-    const { data: { user } } = await userSupabaseClient.auth.getUser();
-    if (!user) return false;
+    const { data, error: userError } = await userSupabaseClient.auth.getUser();
+    if (userError || !data.user) {
+        console.error("Auth error in isAdmin check:", userError?.message);
+        return false;
+    }
+    const { user } = data;
 
     const { data: roleData, error } = await userSupabaseClient
       .from('user_roles')
@@ -17,7 +21,12 @@ async function isAdmin(userSupabaseClient: SupabaseClient): Promise<boolean> {
       .eq('user_id', user.id)
       .single();
       
-    if (error) return false;
+    if (error) {
+        if (error.code !== 'PGRST116') { // PGRST116: no rows returned
+          console.error("Role check error:", error.message);
+        }
+        return false;
+    }
     return (roleData as any)?.roles?.code === 'ADMIN';
 }
 
@@ -34,7 +43,15 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     );
-    const { data: { user: callingUser } } = await userSupabaseClient.auth.getUser();
+    
+    const { data: authData, error: authError } = await userSupabaseClient.auth.getUser();
+    if (authError || !authData.user) {
+        return new Response(JSON.stringify({ error: 'Forbidden: Invalid authentication credentials.' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 403,
+        });
+    }
+    const callingUser = authData.user;
 
     // 2. Check if the user is an admin
     if (!await isAdmin(userSupabaseClient)) {
@@ -75,7 +92,7 @@ Deno.serve(async (req) => {
         if (roleError) throw new Error(`Failed to update role: ${roleError.message}`);
     }
     
-    // 7. Update user_organizations (upsert)
+    // 7. Update user_organizations (upsert or delete)
     if (organization_id) {
          const { error: orgError } = await supabaseAdmin.from('user_organizations').upsert(
             { user_id: user_id, organization_id: organization_id, granted_by: callingUser?.id },
@@ -87,7 +104,7 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from('user_organizations').delete().eq('user_id', user_id);
     }
     
-    // 8. Update user_warehouses (upsert)
+    // 8. Update user_warehouses (upsert or delete)
     if (warehouse_id) {
          const { error: whError } = await supabaseAdmin.from('user_warehouses').upsert(
             { user_id: user_id, warehouse_id: warehouse_id, granted_by: callingUser?.id },

@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -15,7 +16,7 @@ import {
     Select,
     InputNumber,
 } from 'antd';
-import { SaveOutlined, PlusOutlined } from '@ant-design/icons';
+import { SaveOutlined, PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDebounce } from '../../../hooks/useDebounce';
@@ -257,8 +258,8 @@ const GoodsModelFormPage: React.FC = () => {
 
             <div className="fixed bottom-6 right-6 z-50">
                 <Space>
-                    <Button onClick={() => navigate('/product/goods-models')}>Hủy</Button>
-                    <Button type="primary" icon={isEditMode ? <SaveOutlined /> : <PlusOutlined />} htmlType="submit" loading={submitting} form="product-form">
+                    <Button size="large" icon={<ArrowLeftOutlined />} onClick={() => navigate('/product/goods-models')}>Hủy</Button>
+                    <Button size="large" type="primary" icon={isEditMode ? <SaveOutlined /> : <PlusOutlined />} htmlType="submit" loading={submitting} form="product-form">
                         {isEditMode ? 'Lưu' : 'Tạo mới'}
                     </Button>
                 </Space>

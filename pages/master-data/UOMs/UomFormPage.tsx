@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -226,12 +227,13 @@ const UomFormPage: React.FC = () => {
                 </Form>
             </Spin>
 
-            <div className="fixed bottom-0 right-0 p-6 bg-transparent z-50">
+            <div className="fixed bottom-6 right-6 z-50">
                 <Space>
-                    <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/product/uoms')}>
+                    <Button size="large" icon={<ArrowLeftOutlined />} onClick={() => navigate('/product/uoms')}>
                         Hủy
                     </Button>
                     <Button
+                        size="large"
                         type="primary"
                         icon={isEditMode ? <SaveOutlined /> : <PlusOutlined />}
                         htmlType="submit"

@@ -1,5 +1,10 @@
 
 
+
+
+
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -25,6 +30,8 @@ import {
     EyeOutlined,
     FilterOutlined,
     SettingOutlined,
+    PlusOutlined,
+    UploadOutlined,
 } from '@ant-design/icons';
 import { supabase } from '../../lib/supabase';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -32,6 +39,7 @@ import dayjs from 'dayjs';
 import { TablePaginationConfig } from 'antd/lib/table';
 import { SorterResult } from 'antd/lib/table/interface';
 import { Database } from '../../types/supabase';
+import Can from '../../components/auth/Can';
 
 const { RangePicker } = DatePicker;
 
@@ -100,10 +108,24 @@ const SERIAL_LOT_STATUSES: Database['public']['Enums']['serial_lot_status_enum']
 // --- Main Page Component ---
 const LotsSerialsListPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('lots');
+    const navigate = useNavigate();
 
     return (
         <Card>
-            <Typography.Title level={4} style={{ margin: 0, marginBottom: 24 }}>Lots & Serials</Typography.Title>
+            <div className="flex justify-between items-center mb-6">
+                 <Typography.Title level={4} style={{ margin: 0 }}>Lots & Serials</Typography.Title>
+                 <Can module="settings" action="manageUsers">
+                    <Space>
+                        <Button icon={<UploadOutlined />} onClick={() => navigate('/settings/lots-serials/import')}>
+                            Import
+                        </Button>
+                        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/settings/lots-serials/generate-batch')}>
+                            Tạo hàng loạt
+                        </Button>
+                    </Space>
+                </Can>
+            </div>
+           
             <Tabs defaultActiveKey="lots" onChange={(key) => setActiveTab(key as TabKey)}>
                 <Tabs.TabPane tab="Quản lý Lô" key="lots">
                     <TabContent tabKey="lots" />
@@ -234,7 +256,10 @@ const TabContent: React.FC<{ tabKey: TabKey }> = ({ tabKey }) => {
                 render: (_: any, record: any) => (
                     <Space size="small">
                          <Tooltip title="Xem chi tiết">
-                            <button className="table-action-button" onClick={() => navigate('#')}>
+                            <button className="table-action-button" onClick={() => {
+                                const detailPath = isLotsTab ? `/settings/lots-serials/lots/${record.id}` : `/settings/lots-serials/serials/${record.id}`;
+                                navigate(detailPath);
+                            }}>
                                 <EyeOutlined />
                             </button>
                         </Tooltip>
@@ -333,6 +358,12 @@ const TabContent: React.FC<{ tabKey: TabKey }> = ({ tabKey }) => {
                     onChange={handleTableChange}
                     scroll={{ x: 'max-content' }}
                     className="custom-scrollbar"
+                    onRow={(record) => ({
+                        onDoubleClick: () => {
+                            const detailPath = isLotsTab ? `/settings/lots-serials/lots/${record.id}` : `/settings/lots-serials/serials/${record.id}`;
+                            navigate(detailPath);
+                        },
+                    })}
                 />
                  <div className="table-footer">
                     <div>

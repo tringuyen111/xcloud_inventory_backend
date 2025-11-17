@@ -8,11 +8,12 @@ declare var Deno: any;
 
 // Function to check if the calling user is an admin
 async function isAdmin(userSupabaseClient: SupabaseClient): Promise<boolean> {
-    const { data: { user }, error: userError } = await userSupabaseClient.auth.getUser();
-    if (userError || !user) {
-        console.error("Auth error:", userError?.message);
+    const { data, error: userError } = await userSupabaseClient.auth.getUser();
+    if (userError || !data.user) {
+        console.error("Auth error in isAdmin check:", userError?.message);
         return false;
     }
+    const { user } = data;
 
     const { data: roleData, error: roleError } = await userSupabaseClient
       .from('user_roles')
@@ -21,11 +22,13 @@ async function isAdmin(userSupabaseClient: SupabaseClient): Promise<boolean> {
       .single();
       
     if (roleError) {
-        console.error("Role check error:", roleError.message);
+        // This is not a critical error if user just doesn't have a role yet
+        if (roleError.code !== 'PGRST116') { // PGRST116: no rows returned
+          console.error("Role check error:", roleError.message);
+        }
         return false;
     }
     
-    // The type assertion is safe here because we've checked for errors.
     const userRole = (roleData as any)?.roles?.code;
     return userRole === 'ADMIN';
 }
@@ -44,7 +47,15 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     );
-    const { data: { user: callingUser } } = await userSupabaseClient.auth.getUser();
+    
+    const { data: authData, error: authError } = await userSupabaseClient.auth.getUser();
+    if (authError || !authData.user) {
+        return new Response(JSON.stringify({ error: 'Forbidden: Invalid authentication credentials.' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 403,
+        });
+    }
+    const callingUser = authData.user;
 
     // 2. Check if the user is an admin
     if (!await isAdmin(userSupabaseClient)) {

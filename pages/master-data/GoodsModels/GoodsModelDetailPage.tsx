@@ -14,7 +14,6 @@ import {
     Result,
     Tag,
     Image,
-    Empty,
 } from 'antd';
 import { ArrowLeftOutlined, EditOutlined } from '@ant-design/icons';
 import { supabase } from '../../../lib/supabase';

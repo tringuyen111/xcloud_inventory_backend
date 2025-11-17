@@ -1,6 +1,9 @@
 
 
 
+
+
+
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Spin, ConfigProvider, App as AntdApp } from 'antd';
@@ -79,6 +82,10 @@ import RoleFormPage from './pages/settings/RoleFormPage';
 import PermissionMatrixPage from './pages/settings/PermissionMatrixPage';
 import ProfilePage from './pages/settings/ProfilePage';
 import LotsSerialsListPage from './pages/settings/LotsSerialsListPage';
+import LotDetailPage from './pages/settings/LotDetailPage';
+import SerialDetailPage from './pages/settings/SerialDetailPage';
+import LotSerialGenerateBatchPage from './pages/settings/LotSerialGenerateBatchPage';
+import LotSerialImportPage from './pages/settings/LotSerialImportPage';
 
 
 // This component provides the main layout (sidebar, topbar) for all protected pages.
@@ -220,6 +227,10 @@ const App: React.FC = () => {
                     <Route path="/settings/roles" element={<RouteGuard module="navigation" action="viewSettings"><RolesListPage /></RouteGuard>} />
                     <Route path="/settings/roles/:id/permissions" element={<RouteGuard module="settings" action="manageUsers"><RoleFormPage /></RouteGuard>} />
                     <Route path="/settings/lots-serials" element={<RouteGuard module="navigation" action="viewSettings"><LotsSerialsListPage /></RouteGuard>} />
+                    <Route path="/settings/lots-serials/generate-batch" element={<RouteGuard module="navigation" action="viewSettings"><LotSerialGenerateBatchPage /></RouteGuard>} />
+                    <Route path="/settings/lots-serials/import" element={<RouteGuard module="navigation" action="viewSettings"><LotSerialImportPage /></RouteGuard>} />
+                    <Route path="/settings/lots-serials/lots/:id" element={<RouteGuard module="navigation" action="viewSettings"><LotDetailPage /></RouteGuard>} />
+                    <Route path="/settings/lots-serials/serials/:id" element={<RouteGuard module="navigation" action="viewSettings"><SerialDetailPage /></RouteGuard>} />
 
                     
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />

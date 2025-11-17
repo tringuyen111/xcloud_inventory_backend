@@ -1,5 +1,6 @@
 
 
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -16,7 +17,7 @@ import {
     Select,
     InputNumber,
 } from 'antd';
-import { SaveOutlined, PlusOutlined } from '@ant-design/icons';
+import { SaveOutlined, PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../hooks/useAuth';
 import { useDebounce } from '../../../hooks/useDebounce';
@@ -247,8 +248,8 @@ const WarehouseFormPage: React.FC = () => {
 
             <div className="fixed bottom-6 right-6 z-50">
                 <Space>
-                    <Button onClick={() => navigate('/master-data/warehouses')}>Hủy</Button>
-                    <Button type="primary" icon={isEditMode ? <SaveOutlined /> : <PlusOutlined />} htmlType="submit" loading={submitting} form="warehouse-form">
+                    <Button size="large" icon={<ArrowLeftOutlined />} onClick={() => navigate('/master-data/warehouses')}>Hủy</Button>
+                    <Button size="large" type="primary" icon={isEditMode ? <SaveOutlined /> : <PlusOutlined />} htmlType="submit" loading={submitting} form="warehouse-form">
                         {isEditMode ? 'Lưu' : 'Tạo mới'}
                     </Button>
                 </Space>

@@ -12,7 +12,7 @@ import {
     Typography,
     Space,
 } from 'antd';
-import { SaveOutlined, PlusOutlined } from '@ant-design/icons';
+import { SaveOutlined, PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../hooks/useAuth';
 
@@ -182,15 +182,17 @@ const OrganizationFormPage: React.FC = () => {
                 </Form>
             </Spin>
 
-            {/* Floating sticky footer with transparent background */}
             <div className="fixed bottom-6 right-6 z-50">
                 <Space>
                     <Button
+                        size="large"
+                        icon={<ArrowLeftOutlined />}
                         onClick={() => navigate('/master-data/organizations')}
                     >
                         Hủy
                     </Button>
                     <Button
+                        size="large"
                         type="primary"
                         icon={isEditMode ? <SaveOutlined /> : <PlusOutlined />}
                         htmlType="submit"

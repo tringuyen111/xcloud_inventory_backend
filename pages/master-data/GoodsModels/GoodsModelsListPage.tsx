@@ -48,7 +48,9 @@ type ProductViewData = {
   tracking_type: Database['public']['Enums']['tracking_type_enum'];
   base_uom_name: string;
   sku: string | null;
+  organization_name: string;
   created_at: string;
+  created_by_name: string | null;
   updated_at: string;
   updated_by_name: string | null;
 };
@@ -77,7 +79,7 @@ const GoodsModelsListPage: React.FC = () => {
     const [columnPopoverVisible, setColumnPopoverVisible] = useState(false);
     const [productTypes, setProductTypes] = useState<ProductTypeFilterData[]>([]);
 
-    const defaultColumns = ['code', 'name', 'is_active', 'product_type_name', 'tracking_type', 'base_uom_name', 'sku', 'created_at', 'updated_at', 'updated_by_name', 'actions'];
+    const defaultColumns = ['code', 'name', 'is_active', 'product_type_name', 'tracking_type', 'base_uom_name', 'updated_at', 'updated_by_name', 'actions'];
     const [visibleColumns, setVisibleColumns] = useState<string[]>(defaultColumns);
 
     // Fetch product types for the filter dropdown
@@ -173,8 +175,10 @@ const GoodsModelsListPage: React.FC = () => {
         { title: 'Loại sản phẩm', dataIndex: 'product_type_name', key: 'product_type_name', sorter: true },
         { title: 'Loại tracking', dataIndex: 'tracking_type', key: 'tracking_type', sorter: true, render: trackingTypeTag },
         { title: 'ĐVT Cơ bản', dataIndex: 'base_uom_name', key: 'base_uom_name' },
+        { title: 'Tổ chức', dataIndex: 'organization_name', key: 'organization_name', sorter: true },
         { title: 'SKU', dataIndex: 'sku', key: 'sku', sorter: true, render: (text) => text || 'N/A' },
         { title: 'Ngày tạo', dataIndex: 'created_at', key: 'created_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY') : '-' },
+        { title: 'Người tạo', dataIndex: 'created_by_name', key: 'created_by_name', render: (text) => text || 'N/A' },
         { title: 'Ngày cập nhật', dataIndex: 'updated_at', key: 'updated_at', sorter: true, render: (text: string) => text ? dayjs(text).format('DD/MM/YYYY HH:mm') : '-' },
         { title: 'Người cập nhật', dataIndex: 'updated_by_name', key: 'updated_by_name', render: (text) => text || 'N/A' },
         {

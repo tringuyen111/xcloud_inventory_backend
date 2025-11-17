@@ -35,6 +35,8 @@ const pathNameMapping: { [key: string]: string } = {
   roles: 'Roles Management',
   permissions: 'Assign Permissions',
   'lots-serials': 'Lots & Serials',
+  'generate-batch': 'Tạo mã hàng loạt',
+  import: 'Import',
 };
 
 const Breadcrumb: React.FC = () => {

@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -148,12 +149,14 @@ const GoodsTypeFormPage: React.FC = () => {
             <div className="fixed bottom-6 right-6 z-50">
                 <Space>
                     <Button
+                        size="large"
                         icon={<ArrowLeftOutlined />}
                         onClick={() => navigate('/product/goods-types')}
                     >
                         Hủy
                     </Button>
                     <Button
+                        size="large"
                         type="primary"
                         icon={isEditMode ? <SaveOutlined /> : <PlusOutlined />}
                         htmlType="submit"
