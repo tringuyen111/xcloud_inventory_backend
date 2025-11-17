@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -288,6 +289,11 @@ const OnhandListPage: React.FC = () => {
                     onChange={handleTableChange}
                     scroll={{ x: 'max-content' }}
                     className="custom-scrollbar"
+                    onRow={(record) => ({
+                        onDoubleClick: () => {
+                            navigate(`/operations/onhand/${record.warehouse_id}/${record.product_id}`);
+                        },
+                    })}
                 />
                 <div className="table-footer">
                     <div>

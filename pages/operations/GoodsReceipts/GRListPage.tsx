@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -288,7 +289,7 @@ const GRListPage: React.FC = () => {
                 <Typography.Title level={4} style={{ margin: 0 }}>Danh sách Phiếu nhập</Typography.Title>
                 <Can module="operations" action="create">
                     <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/gr/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
-                        Thêm mới Phiếu nhập
+                        Tạo Mới
                     </Button>
                 </Can>
             </div>
@@ -321,6 +322,11 @@ const GRListPage: React.FC = () => {
                     onChange={handleTableChange}
                     scroll={{ x: 'max-content' }}
                     className="custom-scrollbar"
+                    onRow={(record) => ({
+                        onDoubleClick: () => {
+                            navigate(`/operations/gr/${record.id}`);
+                        },
+                    })}
                 />
                 <div className="table-footer">
                     <div>

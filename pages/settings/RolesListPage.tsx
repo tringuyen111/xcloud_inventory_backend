@@ -1,7 +1,5 @@
 
 
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -293,7 +291,7 @@ const RolesListPage: React.FC = () => {
                     <Typography.Title level={4} style={{ margin: 0 }}>Roles Management</Typography.Title>
                     <Can module="settings" action="manageUsers">
                         <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsCreateModalVisible(true)} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
-                            Thêm mới Vai trò
+                            Tạo Mới
                         </Button>
                     </Can>
                 </div>
@@ -326,6 +324,11 @@ const RolesListPage: React.FC = () => {
                         onChange={handleTableChange}
                         scroll={{ x: 'max-content' }}
                         className="custom-scrollbar"
+                        onRow={(record) => ({
+                            onDoubleClick: () => {
+                                navigate(`/settings/roles/${record.id}/permissions`);
+                            },
+                        })}
                     />
                      <div className="table-footer">
                         <div>

@@ -249,7 +249,7 @@ const UomsListPage: React.FC = () => {
                 <Typography.Title level={4} style={{ margin: 0 }}>Units of Measure (UOMs)</Typography.Title>
                 <Can module="masterData" action="create">
                     <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/product/uoms/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
-                        Thêm mới Đơn vị
+                        Tạo Mới
                     </Button>
                 </Can>
             </div>
@@ -282,6 +282,11 @@ const UomsListPage: React.FC = () => {
                     onChange={handleTableChange}
                     scroll={{ x: 'max-content' }}
                     className="custom-scrollbar"
+                    onRow={(record) => ({
+                        onDoubleClick: () => {
+                            navigate(`/product/uoms/${record.id}`);
+                        },
+                    })}
                 />
                  <div className="table-footer">
                     <div>

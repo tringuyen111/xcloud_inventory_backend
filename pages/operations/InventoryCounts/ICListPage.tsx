@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -253,7 +254,7 @@ const ICListPage: React.FC = () => {
                 <Typography.Title level={4} style={{ margin: 0 }}>Danh sách Phiếu kiểm kê</Typography.Title>
                 <Can module="operations" action="create">
                     <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/operations/ic/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
-                        Thêm mới Phiếu kiểm kê
+                        Tạo Mới
                     </Button>
                 </Can>
             </div>
@@ -286,6 +287,11 @@ const ICListPage: React.FC = () => {
                     onChange={handleTableChange}
                     scroll={{ x: 'max-content' }}
                     className="custom-scrollbar"
+                    onRow={(record) => ({
+                        onDoubleClick: () => {
+                            navigate(`/operations/ic/${record.id}`);
+                        },
+                    })}
                 />
                 <div className="table-footer">
                     <div>

@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
@@ -23,8 +24,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onLogout }) => {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar onLogout={onLogout} />
-        <div className="flex-1 overflow-y-auto bg-[#F3F3F9]">
-            <main className="p-6">
+        <div className="flex-1 flex flex-col overflow-y-auto bg-[#F3F3F9]">
+            <main className="flex-grow p-6">
               {children}
             </main>
             <Footer />

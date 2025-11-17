@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -234,7 +235,7 @@ const WarehousesListPage: React.FC = () => {
                 <Typography.Title level={4} style={{ margin: 0 }}>Warehouses</Typography.Title>
                 <Can module="masterData" action="create">
                     <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/warehouses/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
-                        Thêm mới Kho
+                        Tạo Mới
                     </Button>
                 </Can>
             </div>
@@ -267,6 +268,11 @@ const WarehousesListPage: React.FC = () => {
                     onChange={handleTableChange}
                     scroll={{ x: 'max-content' }}
                     className="custom-scrollbar"
+                    onRow={(record) => ({
+                        onDoubleClick: () => {
+                            navigate(`/master-data/warehouses/${record.id}`);
+                        },
+                    })}
                 />
                  <div className="table-footer">
                     <div>

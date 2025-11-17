@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -209,7 +210,7 @@ const UomCategoriesListPage: React.FC = () => {
                 <Typography.Title level={4} style={{ margin: 0 }}>UOM Categories</Typography.Title>
                 <Can module="masterData" action="create">
                     <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/product/uom-categories/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
-                        Thêm mới Nhóm ĐV
+                        Tạo Mới
                     </Button>
                 </Can>
             </div>
@@ -242,6 +243,11 @@ const UomCategoriesListPage: React.FC = () => {
                     onChange={handleTableChange}
                     scroll={{ x: 'max-content' }}
                     className="custom-scrollbar"
+                    onRow={(record) => ({
+                        onDoubleClick: () => {
+                            navigate(`/product/uom-categories/${record.id}`);
+                        },
+                    })}
                 />
                  <div className="table-footer">
                     <div>

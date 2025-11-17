@@ -204,7 +204,7 @@ const GoodsTypesListPage: React.FC = () => {
                 <Typography.Title level={4} style={{ margin: 0 }}>Product Types</Typography.Title>
                 <Can module="masterData" action="create">
                     <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/product/goods-types/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
-                        Thêm mới Loại SP
+                        Tạo Mới
                     </Button>
                 </Can>
             </div>
@@ -237,6 +237,11 @@ const GoodsTypesListPage: React.FC = () => {
                     onChange={handleTableChange}
                     scroll={{ x: 'max-content' }}
                     className="custom-scrollbar"
+                    onRow={(record) => ({
+                        onDoubleClick: () => {
+                            navigate(`/product/goods-types/${record.id}`);
+                        },
+                    })}
                 />
                  <div className="table-footer">
                     <div>

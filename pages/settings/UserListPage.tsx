@@ -257,7 +257,7 @@ const UserListPage: React.FC = () => {
                 <Typography.Title level={4} style={{ margin: 0 }}>User Management</Typography.Title>
                 <Can module="settings" action="manageUsers">
                     <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/settings/users/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
-                        Thêm mới Người dùng
+                        Tạo Mới
                     </Button>
                 </Can>
             </div>
@@ -290,6 +290,11 @@ const UserListPage: React.FC = () => {
                     onChange={handleTableChange}
                     scroll={{ x: 'max-content' }}
                     className="custom-scrollbar"
+                    onRow={(record) => ({
+                        onDoubleClick: () => {
+                            navigate(`/settings/users/${record.id}/edit`);
+                        },
+                    })}
                 />
                  <div className="table-footer">
                     <div>

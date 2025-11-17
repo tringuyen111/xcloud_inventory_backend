@@ -229,7 +229,7 @@ const PartnersListPage: React.FC = () => {
                 <Typography.Title level={4} style={{ margin: 0 }}>Partners</Typography.Title>
                 <Can module="masterData" action="create">
                     <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/master-data/partners/create')} style={{ backgroundColor: '#28a745', borderColor: '#28a745' }}>
-                        Thêm mới Đối tác
+                        Tạo Mới
                     </Button>
                 </Can>
             </div>
@@ -262,6 +262,11 @@ const PartnersListPage: React.FC = () => {
                     onChange={handleTableChange}
                     scroll={{ x: 'max-content' }}
                     className="custom-scrollbar"
+                    onRow={(record) => ({
+                        onDoubleClick: () => {
+                            navigate(`/master-data/partners/${record.id}`);
+                        },
+                    })}
                 />
                  <div className="table-footer">
                     <div>
