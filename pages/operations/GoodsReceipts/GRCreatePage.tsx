@@ -1,4 +1,7 @@
 
+
+
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -139,7 +142,16 @@ const GRCreatePage: React.FC = () => {
     };
 
     // --- Form Submission ---
-    const onFinish = async (values: any) => {
+    const handleSave = async (status: 'DRAFT' | 'CREATED') => {
+        let values;
+        try {
+          values = await form.validateFields();
+        } catch (info) {
+          console.log('Validate Failed:', info);
+          notification.warning({ message: 'Thông tin chưa hợp lệ', description: 'Vui lòng kiểm tra lại các trường dữ liệu bắt buộc.'});
+          return;
+        }
+    
         if (lines.length === 0) {
             notification.error({ message: 'Dữ liệu không hợp lệ', description: 'Vui lòng thêm ít nhất một sản phẩm vào phiếu nhập.' });
             return;
@@ -151,24 +163,14 @@ const GRCreatePage: React.FC = () => {
     
         setSubmitting(true);
         try {
-            // Create a mutable copy from the form's values.
-            const payload = { ...values };
-    
-            // Explicitly delete the 'code' property. This is the crucial step
-            // to ensure it is not sent to the database, allowing the trigger
-            // to generate the code automatically. This resolves the 'not-null' constraint error.
-            delete payload.code;
-    
-            // Prepare the final payload for insertion, ensuring correct types and nulls.
             const headerPayload = {
-                ...payload,
-                warehouse_id: parseInt(payload.warehouse_id, 10),
-                type: payload.type === 'TRANSFER_IN' ? 'ADJUSTMENT' : payload.type,
-                partner_id: payload.partner_id ? parseInt(payload.partner_id, 10) : null,
-                ref_no: payload.ref_no || null,
-                expected_date: payload.expected_date ? dayjs(payload.expected_date).toISOString() : null,
-                notes: payload.notes || null,
-                status: 'CREATED' as const,
+                warehouse_id: parseInt(values.warehouse_id, 10),
+                type: values.type === 'TRANSFER_IN' ? 'ADJUSTMENT' : values.type,
+                partner_id: values.partner_id ? parseInt(values.partner_id, 10) : null,
+                ref_no: values.ref_no || null,
+                expected_date: values.expected_date ? dayjs(values.expected_date).toISOString() : null,
+                notes: values.notes || null,
+                status: status,
                 created_by: user?.id,
                 updated_by: user?.id,
             };
@@ -194,15 +196,18 @@ const GRCreatePage: React.FC = () => {
             const { error: linesError } = await supabase.from('gr_line_items').insert(grLines);
             if (linesError) throw linesError;
     
-            notification.success({ message: 'Tạo phiếu nhập kho thành công' });
+            const successMessage = status === 'DRAFT' ? 'Lưu nháp phiếu nhập kho thành công!' : 'Tạo phiếu nhập kho thành công';
+            notification.success({ message: successMessage });
             navigate('/operations/gr');
     
         } catch (error: any) {
-            notification.error({ message: 'Lỗi tạo phiếu nhập kho', description: `RPC Error: ${error.message}` });
+            const actionText = status === 'DRAFT' ? 'lưu nháp' : 'tạo';
+            notification.error({ message: `Lỗi ${actionText} phiếu nhập kho`, description: error.message });
         } finally {
             setSubmitting(false);
         }
     };
+
 
     const lineColumns: ColumnsType<LineItem> = [
         { 
@@ -261,7 +266,7 @@ const GRCreatePage: React.FC = () => {
 
     return (
         <div className="pb-24">
-            <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ type: 'PURCHASE' }}>
+            <Form form={form} layout="vertical" initialValues={{ type: 'PURCHASE' }}>
                 <Card title={<Title level={4} style={{ margin: 0 }}>Tạo Kế hoạch Nhập kho</Title>} className="mb-6">
                     <Row gutter={24}>
                         <Col xs={24} md={8}>
@@ -342,11 +347,18 @@ const GRCreatePage: React.FC = () => {
                     <Button size="large" icon={<ArrowLeftOutlined />} onClick={() => navigate('/operations/gr')}>Hủy</Button>
                     <Button
                         size="large"
+                        icon={<SaveOutlined />}
+                        loading={submitting}
+                        onClick={() => handleSave('DRAFT')}
+                    >
+                        Lưu nháp
+                    </Button>
+                    <Button
+                        size="large"
                         type="primary"
                         icon={<SaveOutlined />}
-                        htmlType="submit"
                         loading={submitting}
-                        onClick={() => form.submit()}
+                        onClick={() => handleSave('CREATED')}
                     >
                         Tạo mới Phiếu
                     </Button>
